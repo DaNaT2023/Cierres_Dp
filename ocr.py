@@ -34,10 +34,9 @@ inicializar_bd()
 # Lista oficial de tus 6 tiendas reales de Madrid
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
-# FUNCIÓN CORREGIDA: Codifica la imagen en el formato nativo exacto que exige Together AI
 def codificar_y_comprimir_imagen(uploaded_file):
     img = Image.open(uploaded_file)
-    img.thumbnail((1000, 1000)) # Tamaño óptimo para mantener nitidez de números pequeños
+    img.thumbnail((1000, 1000))
     buffer = io.BytesIO()
     img.convert("RGB").save(buffer, format="JPEG", quality=75)
     buffer.seek(0)
@@ -102,7 +101,6 @@ with pestaña_tiendas:
                             "Content-Type": "application/json"
                         }
                         
-                        # ESTRUCTURA CORREGIDA: Formato de payload nativo e indestructible para Llama 3.2 Vision en Together AI
                         payload = {
                             "model": "meta-llama/Llama-3.2-11B-Vision-Instruct",
                             "messages": [
@@ -110,10 +108,7 @@ with pestaña_tiendas:
                                     "role": "user",
                                     "content": [
                                         {"type": "text", "text": prompt_sistema},
-                                        {
-                                            "type": "image_url",
-                                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                                        }
+                                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                                     ]
                                 }
                             ],
@@ -123,7 +118,6 @@ with pestaña_tiendas:
                         url_api = "https://together.xyz"
                         response = requests.post(url_api, headers=headers, json=payload)
                         
-                        # Control de seguridad: Si el servidor responde con un error técnico, lo sacamos en pantalla para saberlo
                         if response.status_code != 200:
                             st.error(f"Error del servidor Together AI (Código {response.status_code}): {response.text}")
                             st.stop()
@@ -131,7 +125,7 @@ with pestaña_tiendas:
                         response_json = response.json()
                         
                         if "choices" in response_json and len(response_json["choices"]) > 0:
-                            texto_ia = response_json["choices"]["message"]["content"]
+                            texto_ia = response_json["choices"][0]["message"]["content"]
                             texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
                             datos_ia = json.loads(texto_ia)
                             
@@ -145,7 +139,7 @@ with pestaña_tiendas:
                     except Exception as e:
                         st.error(f"Error en el procesamiento del flujo visual: {e}")
 
-        # Recuperar datos extraídos nativamente por la IA
+        # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
         val_venta = st.session_state.get('venta_val', 0.0)
         val_quebranto = st.session_state.get('quebranto_val', 0.0)
@@ -198,3 +192,15 @@ with pestaña_dueño:
         if tienda_filtrada != "Todas las tiendas":
             df_mostrar = df[df['tienda'] == tienda_filtrada]
         else:
+            df_mostrar = df
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Ventas", f"{df_mostrar['venta_total'].sum():,.2f} €")
+        c2.metric("Balance Quebrantos", f"{df_mostrar['quebranto'].sum():,.2f} €")
+        c3.metric("Alertas Críticas", len(df_mostrar[df_mostrar['estado_alerta'] != "OK"]))
+        
+        st.markdown("---")
+        st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
+        st.dataframe(df_mostrar, width="stretch")
+        
+        st.markdown("---")
