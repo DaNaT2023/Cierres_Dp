@@ -2,7 +2,8 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
-from google import genai  # Nueva librería oficial de Google
+from google import genai  # Librería oficial de Google
+from PIL import Image     # Para manejar la imagen que subas
 
 # ==========================================
 # 1. BASE DE DATOS (Se crea sola al arrancar)
@@ -43,17 +44,88 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
+    # --- AQUÍ RECUPERAMOS EL BROWSE FILE (SUBIR IMAGEN DEL RECUADRO) ---
+    st.subheader("📸 Subir Recuadro Diario")
+    imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"])
+    
+    datos_automaticos = {}
+    
+    if imagen_subida is not None:
+        st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
+        
+        if st.button("🔍 Leer Recuadro con IA"):
+            with st.spinner("Analizando la foto del recuadro con Gemini..."):
+                try:
+                    # Abrir la imagen con PIL
+                    img = Image.open(imagen_subida)
+                    
+                    # Conectar con el cliente de Google
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                    
+                    # Prompt estricto para extraer datos en formato clave-valor limpia
+                    prompt_ocr = """
+                    Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
+                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
+                    Tienda: [Número de tienda, ej: Tienda 1]
+                    Turno: [Mañana o Noche]
+                    Encargado: [Nombre del encargado]
+                    Venta: [Número de la venta total sin símbolos]
+                    Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
+                    """
+                    
+                    # Gemini 2.5 Flash procesa texto e imágenes a la vez de forma nativa
+                    response_ocr = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=[img, prompt_ocr]
+                    )
+                    
+                    texto_extraido = response_ocr.text
+                    st.info("Datos detectados en la imagen:")
+                    st.text(texto_extraido)
+                    
+                    # Procesar las líneas de texto para precargar el formulario abajo
+                    for linea in texto_extraido.split("\n"):
+                        if ":" in linea:
+                            clave, valor = linea.split(":", 1)
+                            datos_automaticos[clave.strip().lower()] = valor.strip()
+                            
+                    st.success("¡Datos leídos! Revisa el formulario abajo antes de guardar.")
+                    
+                except Exception as e:
+                    st.error(f"Error al analizar la imagen: {e}")
+
+    st.markdown("---")
+    st.subheader("📝 Confirmar Datos del Formulario")
+    
+    # Rellenar inputs con lo que leyó la IA (o vacíos por defecto)
+    tienda_def = datos_automaticos.get("tienda", "Tienda 1")
+    lista_tiendas = [f"Tienda {i}" for i in range(1, 7)]
+    tienda_idx = lista_tiendas.index(tienda_def) if tienda_def in lista_tiendas else 0
+    
+    turno_def = datos_automaticos.get("turno", "Mañana")
+    turno_idx = 0 if turno_def.lower() == "mañana" else 1
+    
     col_izq, col_der = st.columns(2)
     
     with col_izq:
-        tienda = st.selectbox("Selecciona tu Tienda", [f"Tienda {i}" for i in range(1, 7)])
-        turno = st.radio("Turno Actual", ["Mañana", "Noche"])
-        encargado = st.text_input("Nombre del Encargado (ej: Diego, Naiara)")
+        tienda = st.selectbox("Selecciona tu Tienda", lista_tiendas, index=tienda_idx)
+        turno = st.radio("Turno Actual", ["Mañana", "Noche"], index=turno_idx)
+        encargado = st.text_input("Nombre del Encargado", value=datos_automaticos.get("encargado", ""))
         
     with col_der:
         fecha = st.date_input("Fecha del Recuadro", datetime.date.today())
-        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0)
-        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0)
+        
+        try:
+            venta_val = float(datos_automaticos.get("venta", 0.0))
+        except:
+            venta_val = 0.0
+        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0, value=venta_val)
+        
+        try:
+            quebranto_val = float(datos_automaticos.get("quebranto", 0.0))
+        except:
+            quebranto_val = 0.0
+        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0, value=quebranto_val)
 
     if st.button("🚀 Procesar y Guardar Registro"):
         if encargado == "":
@@ -97,9 +169,6 @@ with pestaña_dueño:
         st.markdown("### Tabla Completa de Registros")
         st.dataframe(df, use_container_width=True)
         
-        # ------------------------------------------
-        # NUEVA FUNCIÓN: AUDITORÍA CON INTELIGENCIA ARTIFICIAL (GEMINI)
-        # ------------------------------------------
         st.markdown("---")
         st.markdown("### 🤖 Auditoría Automatizada con IA")
         st.write("Genera un reporte estratégico analizando las desviaciones y rendimientos de las 6 tiendas.")
@@ -107,13 +176,9 @@ with pestaña_dueño:
         if st.button("📊 Generar Informe con Gemini"):
             with st.spinner("Analizando métricas y registros con Google Gemini..."):
                 try:
-                    # Inicializamos el cliente oficial de Google usando la clave de tus Secrets
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                    
-                    # Convertimos los últimos datos a texto para que la IA los procese
                     datos_texto = df.to_string(index=False)
                     
-                    # Creamos un prompt específico para el negocio
                     prompt = f"""
                     Actúa como un Auditor de Finanzas y Operaciones experto en Retail. 
                     Analiza los siguientes registros de cierre de caja de nuestra cadena de 6 tiendas:
@@ -128,16 +193,13 @@ with pestaña_dueño:
                     Hazlo directo, profesional y claro para el dueño del negocio.
                     """
                     
-                    # Llamada directa al modelo gratuito y rápido gemini-2.5-flash
                     response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=prompt
                     )
                     
-                    # Mostramos el resultado limpio en pantalla
                     st.success("¡Informe generado con éxito!")
                     st.markdown(response.text)
                     
                 except Exception as e:
                     st.error(f"Error al conectar con la IA: {e}")
-                    st.info("Asegúrate de haber guardado exactamente 'GEMINI_API_KEY' en la pestaña de Secrets en Streamlit.")
