@@ -2,7 +2,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
-import time  # Necesario para controlar las pausas de reintento contra el error 429
+import time  # Para controlar las pausas de reintento contra el error 429
 from google import genai  # Librería oficial de Google
 from PIL import Image     # Para manejar la imagen que subas
 
@@ -69,7 +69,6 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    # SELECCIÓN DE TURNO RESTAURADA
     col_pre1, col_pre2 = st.columns(2)
     with col_pre1:
         turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True)
@@ -105,15 +104,14 @@ with pestaña_tiendas:
                     Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
-                    # --- CAMBIO ESTRATÉGICO: MODELO LITE Y REINTENTO EXTENDIDO CONTRA ERROR 429 ---
                     response_ocr = None
                     intentos = 0
-                    tiempo_espera = 4  # Aumentamos el retraso inicial para liberar la cuota de Google
+                    tiempo_espera = 4
                     
                     while intentos < 5:
                         try:
                             response_ocr = client.models.generate_content(
-                                model="gemini-2.5-flash-lite",  # Modelo Lite optimizado para menor consumo de cuota
+                                model="gemini-2.5-flash-lite",
                                 contents=[img, prompt_ocr]
                             )
                             break
@@ -122,9 +120,9 @@ with pestaña_tiendas:
                                 intentos += 1
                                 if intentos == 5:
                                     raise api_error
-                                st.warning(f"Saturación de API (429). Esperando {tiempo_espera} segundos para desbloquear el canal...")
+                                st.warning(f"Saturación de API (429). Esperando {tiempo_espera} segundos...")
                                 time.sleep(tiempo_espera)
-                                tiempo_espera += 4  # Progresión lineal controlada
+                                tiempo_espera += 4
                             else:
                                 raise api_error
                     
@@ -207,3 +205,9 @@ with pestaña_tiendas:
 # SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
 # ------------------------------------------
 with pestaña_dueño:
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido al Propietario")
+        st.write("Por favor, introduce tus credenciales para ver el histórico y acceder a las funciones de edición.")
+        
+        c_log1, c_log2 = st.columns(2)
+        with c_log1:
