@@ -220,10 +220,9 @@ with pestaña_dueño:
             st.markdown("### 🛠️ Modificar o Eliminar Registros")
             
             id_seleccionada = st.selectbox("Selecciona la ID del registro a gestionar", df["id"].tolist())
-            fila_editar = df[df["id"] == id_seleccionada].iloc[0]
             
-            st.write(f"Modificando registro actual de: **{fila_editar['tienda']}** ({fila_editar['fecha']})")
-            
-            col_ed1, col_ed2 = st.columns(2)
-            
-            with col_ed1:
+            # Extracción segura de valores sin usar .iloc
+            df_filtrado = df[df["id"] == id_seleccionada]
+            val_tienda = df_filtrado["tienda"].values[0]
+            val_fecha = df_filtrado["fecha"].values[0]
+            val_encargado = df_filtrado["encargado"].values[0]
