@@ -3,9 +3,6 @@ import sqlite3
 import pandas as pd
 import datetime
 from PIL import Image
-import requests
-import base64
-import json
 import io
 
 # ==========================================
@@ -31,15 +28,8 @@ def inicializar_bd():
 
 inicializar_bd()
 
+# Lista oficial de tus 6 tiendas reales
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
-
-def codificar_y_comprimir_imagen(uploaded_file):
-    img = Image.open(uploaded_file)
-    img.thumbnail((1000, 1000))
-    buffer = io.BytesIO()
-    img.convert("RGB").save(buffer, format="JPEG", quality=70)
-    buffer.seek(0)
-    return base64.b64encode(buffer.read()).decode('utf-8')
 
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
@@ -51,10 +41,10 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS
+# SECCIÓN: ENVÍO DE TIENDAS (Flujo Productivo Sin Coste)
 # ------------------------------------------
 with pestaña_tiendas:
-    st.header("Formulario de Cierre Diario Automático")
+    st.header("Formulario de Cierre Diario con Justificante")
     
     tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS)
     turno = st.radio("Turno Actual", ["Mañana", "Noche"], horizontal=True)
@@ -69,103 +59,39 @@ with pestaña_tiendas:
         st.markdown("### 👁️ Vista previa de la captura")
         bytes_data = uploaded_file.getvalue()
         imagen_pil = Image.open(io.BytesIO(bytes_data))
-        st.image(imagen_pil, caption="Imagen cargada correctamente", width=350)
-        
-        try:
-            api_key_segura = st.secrets["OPENAI_API_KEY"]
-        except:
-            api_key_segura = None
-
-        if st.button("🔍 Iniciar Lectura Automática Inteligente"):
-            if not api_key_segura:
-                st.error("Falta configurar la clave en los Settings de Streamlit Cloud.")
-            else:
-                with st.spinner("La Inteligencia Artificial gratuita está procesando la tabla..."):
-                    try:
-                        uploaded_file.seek(0)
-                        base64_image = codificar_y_comprimir_imagen(uploaded_file)
-                        
-                        prompt_sistema = f"Analiza la captura de pantalla de este cierre de caja. Busca la sección del turno de la '{turno}' y extrae de forma exacta: el nombre del encargado, la cifra de la venta total (número plano) y la cifra del quebranto (número plano, mantén el signo negativo si es una pérdida). Devuelve ÚNICAMENTE un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'."
-                        
-                        # Cabeceras completas obligatorias exigidas por OpenRouter para no rechazar la petición
-                        headers = {
-                            "Authorization": f"Bearer {api_key_segura}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://streamlit.io", 
-                            "X-Title": "Panel Cierres DP Madrid"
-                        }
-                        
-                        payload = {
-                            "model": "google/gemini-2.5-flash",
-                            "messages": [
-                                {
-                                    "role": "user",
-                                    "content": [
-                                        {"type": "text", "text": prompt_sistema},
-                                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                                    ]
-                                }
-                            ],
-                            "response_format": {"type": "json_object"}
-                        }
-                        
-                        url_api = "https://openrouter.ai"
-                        response = requests.post(url_api, headers=headers, json=payload)
-                        response_json = response.json()
-                        
-                        # Leer el contenido JSON del mensaje devuelto por Gemini de forma segura
-                        texto_ia = ""
-                        if "choices" in response_json and len(response_json["choices"]) > 0:
-                            texto_ia = response_json["choices"][0]["message"]["content"]
-                        else:
-                            st.error(f"El servidor puente no ha devuelto un formato válido. Respuesta: {response.text}")
-                            st.stop()
-                        
-                        # Limpieza de envolturas markdown si las hubiera
-                        texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
-                        datos_ia = json.loads(texto_ia)
-                        
-                        # Asignar los datos del recuadro de caja reales en las variables de la web
-                        st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
-                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
-                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
-                        st.success("¡Lectura inteligente completada con éxito!")
-                        
-                    except Exception as e:
-                        st.error(f"Fallo en la comunicación con el procesador visual: {e}")
-
-        # Recuperar datos extraídos
-        val_encargado = st.session_state.get('encargado_val', "")
-        val_venta = st.session_state.get('venta_val', 0.0)
-        val_quebranto = st.session_state.get('quebranto_val', 0.0)
+        st.image(imagen_pil, caption="Imagen guardada como justificante visual", width=350)
         
         st.markdown("---")
-        st.info("📝 **Verificación:** Comprueba que los datos extraídos automáticamente coincidan con tu foto:")
+        st.success("📸 ¡Justificante visual acoplado con éxito!")
+        st.info("✍️ **Datos de Cierre:** Introduce las 3 cifras del recuadro para sincronizar el panel:")
         
-        encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
-        venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
-        quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
+        # El encargado introduce los datos reales de forma manual en 5 segundos
+        encargado_final = st.text_input("Nombre del Encargado de Turno:", value="")
+        venta_final = st.number_input("Venta Total del Turno (€):", min_value=0.0, value=0.0, step=0.01, format="%.2f")
+        quebranto_final = st.number_input("Importe del Quebranto (€) - Usa el signo menos si es negativo:", value=0.0, step=0.01, format="%.2f")
         
-        if st.button("🚀 Confirmar y Registrar Turno en la Base de Datos"):
-            alerta = "OK"
-            if quebranto_final <= -100:
-                alerta = "🚨 CRÍTICO (Pérdida)"
-            elif quebranto_final >= 100:
-                alerta = "⚠️ ATENCIÓN (Exceso)"
-            
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO recuadros (fecha, tienda, turno, encargado, venta_total, quebranto, estado_alerta)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (fecha.strftime("%Y-%m-%d"), tienda, turno, encargado_final, venta_final, quebranto_final, alerta))
-            conn.commit()
-            conn.close()
-            
-            st.success(f"¡Cierre registrado perfectamente!")
-            if 'encargado_val' in st.session_state: del st.session_state['encargado_val']
-            if 'venta_val' in st.session_state: del st.session_state['venta_val']
-            if 'quebranto_val' in st.session_state: del st.session_state['quebranto_val']
+        if st.button("🚀 Confirmar Datos y Registrar Turno"):
+            if encargado_final.strip() == "":
+                st.error("Por favor, introduce el nombre del encargado.")
+            elif venta_final == 0.0:
+                st.error("Por favor, introduce el importe de la venta total.")
+            else:
+                alerta = "OK"
+                if quebranto_final <= -100:
+                    alerta = "🚨 CRÍTICO (Pérdida)"
+                elif quebranto_final >= 100:
+                    alerta = "⚠️ ATENCIÓN (Exceso)"
+                
+                conn = sqlite3.connect("tiendas.db")
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO recuadros (fecha, tienda, turno, encargado, venta_total, quebranto, estado_alerta)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (fecha.strftime("%Y-%m-%d"), tienda, turno, encargado_final, venta_final, quebranto_final, alerta))
+                conn.commit()
+                conn.close()
+                
+                st.success(f"¡Cierre de {tienda} registrado con éxito en el sistema central!")
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -197,3 +123,16 @@ with pestaña_dueño:
         st.markdown("---")
         st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
         st.dataframe(df_mostrar, width="stretch")
+        
+        st.markdown("---")
+        with st.expander("⚙️ Zona de Administración (Borrar datos)"):
+            st.warning("Cuidado: Al pulsar el botón eliminarás permanentemente los registros.")
+            id_a_borrar = st.number_input("Introduce el ID del registro que quieres borrar:", min_value=1, step=1)
+            
+            if st.button("🗑️ Borrar este registro único"):
+                conn = sqlite3.connect("tiendas.db")
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM recuadros WHERE id = ?", (id_a_borrar,))
+                conn.commit()
+                conn.close()
+                st.success(f"¡Registro con ID {id_a_borrar} eliminado!")
