@@ -209,5 +209,4 @@ with pestaña_dueño:
         st.subheader("🔒 Acceso Restringido al Propietario")
         st.write("Por favor, introduce tus credenciales para ver el histórico y acceder a las funciones de edición.")
         
-        c_log1, c_log2 = st.columns(2)
-        with c_log1:
+        input_usuario = st.text_input("Usuario", key="login_user")
