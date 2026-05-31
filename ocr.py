@@ -82,7 +82,7 @@ with pestaña_tiendas:
                     
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
-                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
+                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones and sin marcas de formato (no uses bloques de código ```):
                     Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                     Turno: [Mañana o Noche]
                     Encargado: [Nombre del encargado]
@@ -205,8 +205,10 @@ with pestaña_dueño:
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     datos_texto = df.to_string(index=False)
                     
-                    # Prompt cerrado correctamente con comillas triples limpias
                     prompt_dueño = "Actúa como un Auditor de Finanzas experto en Retail. Analiza estos cierres de caja de nuestras tiendas DP:\n\n" + datos_texto + "\n\nRedacta un informe ejecutivo rápido con: 1. Resumen general de la salud financiera del periodo. 2. Análisis de las alertas críticas detectadas por quebrantos (pérdidas notables o excesos). 3. Recomendación de a qué tiendas o encargados se les debe solicitar una revisión de caja prioritaria. Hazlo directo, profesional y claro para el dueño del negocio."
                     
                     response = client.models.generate_content(
                         model="gemini-2.5-flash",
+                        contents=prompt_dueño
+                    )
+                    
