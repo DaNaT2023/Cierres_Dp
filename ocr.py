@@ -17,8 +17,22 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# === ENMASCARAMIENTO OPERATIVO DE MEMORIA PERSISTENTE CONTRA REINICIOS ===
-if "bd_inicializada" not in st.session_state:
+# Inicializar variables en el estado de la sesión para evitar fallos de lectura
+if "tienda_detectada" not in st.session_state:
+    st.session_state.tienda_detectada = "Dp Valdebebas"
+if "encargado_detectado" not in st.session_state:
+    st.session_state.encargado_detectado = ""
+if "venta_detectada" not in st.session_state:
+    st.session_state.venta_detectada = 0.0
+if "quebranto_detectado" not in st.session_state:
+    st.session_state.quebranto_detectado = 0.0
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+# ==========================================
+# 1. BASE DE DATOS (Se crea sola al arrancar)
+# ==========================================
+def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
     cursor = conexion.cursor()
     cursor.execute("""
@@ -35,19 +49,8 @@ if "bd_inicializada" not in st.session_state:
     """)
     conexion.commit()
     conexion.close()
-    st.session_state.bd_inicializada = True
 
-# Inicializar variables de intercambio del formulario
-if "tienda_detectada" not in st.session_state:
-    st.session_state.tienda_detectada = "Dp Valdebebas"
-if "encargado_detectado" not in st.session_state:
-    st.session_state.encargado_detectado = ""
-if "venta_detectada" not in st.session_state:
-    st.session_state.venta_detectada = 0.0
-if "quebranto_detectado" not in st.session_state:
-    st.session_state.quebranto_detectado = 0.0
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
+inicializar_bd()
 
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
@@ -175,6 +178,7 @@ with pestaña_tiendas:
             
             st.success(f"¡Datos de {tienda} ({turno}) guardados con éxito!")
             
+            # Limpiar memoria intermedia para el próximo recuadro
             st.session_state.encargado_detectado = ""
             st.session_state.venta_detectada = 0.0
             st.session_state.quebranto_detectado = 0.0
@@ -186,7 +190,7 @@ with pestaña_tiendas:
 with pestaña_dueño:
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido al Propietario")
-        st.write("Introduce tus credenciales para ver la tabla histórica y acceder a las funciones de borrado o modificación.")
+        st.write("Por favor, introduce tus credenciales para ver el histórico general y acceder al borrador de datos.")
         
         c_log1, c_log2 = st.columns(2)
         with c_log1:
@@ -197,7 +201,7 @@ with pestaña_dueño:
         if st.button("🔓 Entrar al Panel"):
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
                 st.session_state.autenticado = True
-                st.success("¡Autenticación correcta!")
+                st.success("¡Autenticación correcta! Cargando base de datos...")
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
@@ -206,7 +210,5 @@ with pestaña_dueño:
             st.session_state.autenticado = False
             st.rerun()
             
-        st.header("Histórico de Ventas y Quebrantos en Tiempo Real")
+        st.header("📋 Histórico General de Cierres")
         
-        # Conexión directa a la base de datos compartida
-        conn = sqlite3.connect("tiendas.db")
