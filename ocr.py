@@ -81,8 +81,13 @@ with pestaña_tiendas:
                 img = Image.open(imagen_subida)
                 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                 
+                # MODIFICACIÓN IMPORTANTE: Instrucción reforzada para evitar la venta neta
                 prompt_ocr = f"""
                 Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
+                
+                ATENCIÓN CON LA VENTA: Busca el valor de la VENTA TOTAL (bruta/final con impuestos incluidos). 
+                IGNORA por completo el campo o la casilla de "venta neta" o "base imponible". Queremos el sumatorio total del turno.
+                
                 Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
                 Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                 Turno: [Mañana o Noche]
@@ -219,10 +224,3 @@ with pestaña_dueño:
             st.markdown("---")
             st.markdown("### 🛠️ Modificar o Eliminar Registros")
             
-            id_seleccionada = st.selectbox("Selecciona la ID del registro a gestionar", df["id"].tolist())
-            
-            # Extracción segura de valores sin usar .iloc
-            df_filtrado = df[df["id"] == id_seleccionada]
-            val_tienda = df_filtrado["tienda"].values[0]
-            val_fecha = df_filtrado["fecha"].values[0]
-            val_encargado = df_filtrado["encargado"].values[0]
