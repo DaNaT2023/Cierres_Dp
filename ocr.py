@@ -80,7 +80,7 @@ with pestaña_tiendas:
             if not api_key_segura:
                 st.error("Falta configurar la clave en los Settings de Streamlit Cloud (dentro de Secrets).")
             else:
-                with st.spinner("La Inteligencia Artificial de Meta está analizando visualmente el recuadro..."):
+                with st.spinner("La Inteligencia Artificial está analizando visualmente el recuadro..."):
                     try:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
@@ -97,9 +97,9 @@ with pestaña_tiendas:
                         Ejemplo de formato de salida: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
                         """
                         
-                        # IDENTIFICADOR CORREGIDO EN MINÚSCULAS: Garantiza la compatibilidad con el servidor
+                        # APUNTAMOS AL NOMBRE UNIVERSAL ESTABLE DE LECTURA VISUAL
                         response = client.chat.completions.create(
-                            model="meta-llama/llama-3.2-11b-vision-instruct",
+                            model="meta-llama/Llama-Vision-Free",
                             messages=[
                                 {
                                     "role": "user",
