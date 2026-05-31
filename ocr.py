@@ -34,20 +34,12 @@ inicializar_bd()
 # Lista oficial de tus 6 tiendas reales
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
-# FUNCIÓN MEJORADA: Comprime la foto al vuelo para evitar el Error 413
 def codificar_y_comprimir_imagen(uploaded_file):
-    # Abrimos la imagen original
     img = Image.open(uploaded_file)
-    
-    # Si la imagen es gigante, la reducimos a un tamaño manejable (máximo 1000 píxeles)
     img.thumbnail((1000, 1000))
-    
-    # La guardamos en memoria optimizando el peso al máximo (calidad 70%)
     buffer = io.BytesIO()
     img.convert("RGB").save(buffer, format="JPEG", quality=70)
     buffer.seek(0)
-    
-    # La convertimos a texto Base64 para enviarla de forma ligera
     return base64.b64encode(buffer.read()).decode('utf-8')
 
 # ==========================================
@@ -91,7 +83,6 @@ with pestaña_tiendas:
             else:
                 with st.spinner("La Inteligencia Artificial gratuita está analizando la tabla..."):
                     try:
-                        # Reseteamos el puntero y usamos la nueva función de compresión anti-error 413
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
@@ -106,7 +97,7 @@ with pestaña_tiendas:
                         1. El nombre del encargado de ese turno específico.
                         2. El valor numérico de la Venta Total de ese turno.
                         3. El valor numérico del Quebranto de ese turno (si tiene un signo menos o es negativo, mantén el signo negativo).
-                        Devuelve la respuesta estrictamente en formato JSON plano con esta estructura, sin textos adicionales:
+                        Devuelve la respuesta estrictamente en formato JSON plano con esta estructura, sin textos adicionales ni bloques markdown de código:
                         {{"encargado": "Nombre", "venta": 1200.50, "quebranto": -15.20}}
                         """
                         
@@ -120,17 +111,26 @@ with pestaña_tiendas:
                                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                                     ]
                                 }
-                            ],
-                            response_format={"type": "json_object"}
+                            ]
                         )
                         
-                        datos_ia = json.loads(response.choices.message.content)
+                        # --- SISTEMA DE EXTRACCIÓN ANTI-FALLOS ---
+                        # Manejamos de forma segura si OpenRouter responde como texto o como objeto
+                        if isinstance(response, str):
+                            texto_respuesta = response
+                        else:
+                            texto_respuesta = response.choices[0].message.content
+                        
+                        # Limpieza de posibles bloques markdown que meta la IA por error
+                        texto_respuesta = texto_respuesta.replace("```json", "").replace("```", "").strip()
+                        
+                        datos_ia = json.loads(texto_respuesta)
                         st.session_state['encargado_val'] = datos_ia.get("encargado", "Desconocido")
                         st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
                         st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
                         st.success("¡Lectura completada con éxito!")
                     except Exception as e:
-                        st.error(f"Error en el servicio de visión artificial gratuito: {e}")
+                        st.error(f"Error en el descifrado de la imagen: {e}")
 
         # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
@@ -195,16 +195,3 @@ with pestaña_dueño:
         st.markdown("---")
         st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
         st.dataframe(df_mostrar, width="stretch")
-        
-        st.markdown("---")
-        with st.expander("⚙️ Zona de Administración (Borrar datos)"):
-            st.warning("Cuidado: Al pulsar el botón eliminarás permanentemente los registros.")
-            id_a_borrar = st.number_input("Introduce el ID del registro que quieres borrar:", min_value=1, step=1)
-            
-            if st.button("🗑️ Borrar este registro único"):
-                conn = sqlite3.connect("tiendas.db")
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM recuadros WHERE id = ?", (id_a_borrar,))
-                conn.commit()
-                conn.close()
-                st.success(f"¡Registro con ID {id_a_borrar} eliminado! Recarga la página.")
