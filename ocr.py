@@ -80,7 +80,7 @@ with pestaña_tiendas:
             if not api_key_segura:
                 st.error("Falta configurar la clave en los Settings de Streamlit Cloud (dentro de Secrets).")
             else:
-                with st.spinner("La Inteligencia Artificial está analizando visualmente el recuadro..."):
+                with st.spinner("La Inteligencia Artificial de alta velocidad está analizando la tabla..."):
                     try:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
@@ -97,9 +97,9 @@ with pestaña_tiendas:
                         Ejemplo de formato de salida: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
                         """
                         
-                        # APUNTAMOS AL NOMBRE UNIVERSAL ESTABLE DE LECTURA VISUAL
+                        # MODELO CAMBIADO A QWEN VL: Máxima estabilidad y disponibilidad garantizada en servidores comerciales
                         response = client.chat.completions.create(
-                            model="meta-llama/Llama-Vision-Free",
+                            model="Qwen/Qwen2-VL-7B-Instruct",
                             messages=[
                                 {
                                     "role": "user",
@@ -125,7 +125,7 @@ with pestaña_tiendas:
                         st.success("¡Lectura inteligente completada con éxito! Verifica los datos abajo.")
                         
                     except Exception as e:
-                        st.error(f"Error en el procesamiento del conector oficial: {e}")
+                        st.error(f"Error en el procesamiento del conector de alta velocidad: {e}")
 
         # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
