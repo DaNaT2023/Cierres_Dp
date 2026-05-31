@@ -87,9 +87,12 @@ with pestaña_tiendas:
                         
                         prompt_sistema = f"Analiza la captura de pantalla de este cierre de caja. Busca la sección del turno de la '{turno}' y extrae de forma exacta: el nombre del encargado, la cifra de la venta total (número plano) y la cifra del quebranto (número plano, mantén el signo negativo si es una pérdida). Devuelve ÚNICAMENTE un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'."
                         
+                        # Cabeceras completas obligatorias exigidas por OpenRouter para no rechazar la petición
                         headers = {
                             "Authorization": f"Bearer {api_key_segura}",
-                            "Content-Type": "application/json"
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://streamlit.io", 
+                            "X-Title": "Panel Cierres DP Madrid"
                         }
                         
                         payload = {
@@ -102,34 +105,27 @@ with pestaña_tiendas:
                                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                                     ]
                                 }
-                            ]
+                            ],
+                            "response_format": {"type": "json_object"}
                         }
                         
                         url_api = "https://openrouter.ai"
                         response = requests.post(url_api, headers=headers, json=payload)
                         response_json = response.json()
                         
-                        # --- DESEMPAQUETADOR INTELIGENTE ANTI-FALLOS ---
+                        # Leer el contenido JSON del mensaje devuelto por Gemini de forma segura
                         texto_ia = ""
-                        
-                        # Buscamos el texto de la IA recorriendo el mapa de la respuesta de forma segura
                         if "choices" in response_json and len(response_json["choices"]) > 0:
-                            choice = response_json["choices"][0]
-                            if "message" in choice and "content" in choice["message"]:
-                                texto_ia = choice["message"]["content"]
-                        elif "content" in response_json:
-                            texto_ia = response_json["content"]
+                            texto_ia = response_json["choices"][0]["message"]["content"]
                         else:
-                            # Si OpenRouter devuelve el texto directo en la raíz de la respuesta
-                            texto_ia = response.text
+                            st.error(f"El servidor puente no ha devuelto un formato válido. Respuesta: {response.text}")
+                            st.stop()
                         
-                        # Limpieza profunda de posibles bloques de código markdown que meta la IA (```json ... ```)
+                        # Limpieza de envolturas markdown si las hubiera
                         texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
-                        
-                        # Convertimos el texto a datos de Python
                         datos_ia = json.loads(texto_ia)
                         
-                        # Inyectamos los datos reales en las casillas correspondientes
+                        # Asignar los datos del recuadro de caja reales en las variables de la web
                         st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
                         st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
                         st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
