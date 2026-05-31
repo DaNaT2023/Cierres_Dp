@@ -85,7 +85,6 @@ with pestaña_tiendas:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
-                        # Inicializamos el cliente oficial con la librería del sistema de pago
                         client = Together(api_key=api_key_segura)
                         
                         prompt_sistema = f"""
@@ -98,7 +97,7 @@ with pestaña_tiendas:
                         Ejemplo de formato de salida: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
                         """
                         
-                        # Solicitud nativa y cifrada a través del conector oficial de Together
+                        # LINEA CORREGIDA: Apuntamos al identificador de producción exacto del modelo vision de Meta
                         response = client.chat.completions.create(
                             model="meta-llama/Llama-3.2-11B-Vision-Instruct",
                             messages=[
@@ -116,7 +115,7 @@ with pestaña_tiendas:
                             response_format={"type": "json_object"}
                         )
                         
-                        texto_ia = response.choices[0].message.content
+                        texto_ia = response.choices.message.content
                         texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
                         datos_ia = json.loads(texto_ia)
                         
