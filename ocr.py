@@ -90,7 +90,6 @@ with pestaña_tiendas:
                             api_key=api_key_segura
                         )
                         
-                        # Cambiamos el prompt para que use etiquetas súper claras y fáciles de cazar
                         prompt_sistema = f"""
                         Analiza esta captura de un recuadro diario de caja.
                         Busca la columna correspondiente al turno de la '{turno}' y extrae los datos.
@@ -131,7 +130,7 @@ with pestaña_tiendas:
                             
                             elif "[VENTA]" in linea_limpia:
                                 valor_str = linea_limpia.replace("[VENTA]", "").strip()
-                                valor_str = re.sub(r'[^\d.,-]', '', valor_str) # Quita letras o espacios residuales
+                                valor_str = re.sub(r'[^\d.,-]', '', valor_str)
                                 try:
                                     venta_auto = float(valor_str.replace(",", "."))
                                 except:
@@ -163,7 +162,7 @@ with pestaña_tiendas:
         
         encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
         venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
-        quebranto_final = st.number_input("Quebranto leído (€):", value=val_went_quebranto := val_quebranto, step=0.01, format="%.2f")
+        quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
         
         if st.button("🚀 Confirmar y Registrar Turno en la Base de Datos"):
             alerta = "OK"
@@ -215,3 +214,4 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
+        st.dataframe(df_mostrar, width="stretch")
