@@ -75,57 +75,56 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA"):
-            with st.spinner("Analizando la foto del recuadro con Gemini..."):
-                try:
-                    img = Image.open(imagen_subida)
-                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                    
-                    prompt_ocr = f"""
-                    Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
-                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones and sin marcas de formato (no uses bloques de código ```):
-                    Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
-                    Turno: [Mañana o Noche]
-                    Encargado: [Nombre del encargado]
-                    Venta: [Número de la venta total sin símbolos]
-                    Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
-                    """
-                    
-                    response_ocr = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=[img, prompt_ocr]
-                    )
-                    
-                    texto_extraido = response_ocr.text
-                    st.info("Datos detectados en la imagen:")
-                    st.text(texto_extraido)
-                    
-                    for linea in texto_extraido.split("\n"):
-                        if ":" in linea:
-                            clave, valor = linea.split(":", 1)
-                            clave = clave.strip().lower()
-                            valor = valor.strip()
+            try:
+                img = Image.open(imagen_subida)
+                client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                
+                prompt_ocr = f"""
+                Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
+                Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
+                Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
+                Turno: [Mañana o Noche]
+                Encargado: [Nombre del encargado]
+                Venta: [Número de la venta total sin símbolos]
+                Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
+                """
+                
+                response_ocr = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[img, prompt_ocr]
+                )
+                
+                texto_extraido = response_ocr.text
+                st.info("Datos detectados en la imagen:")
+                st.text(texto_extraido)
+                
+                for linea in texto_extraido.split("\n"):
+                    if ":" in linea:
+                        clave, valor = linea.split(":", 1)
+                        clave = clave.strip().lower()
+                        valor = valor.strip()
+                        
+                        if clave == "tienda" and valor in LISTA_TIENDAS:
+                            st.session_state.tienda_detectada = valor
+                        elif clave == "turno":
+                            st.session_state.turno_detectado = "Noche" if "noche" in valor.lower() else "Mañana"
+                        elif clave == "encargado":
+                            st.session_state.encargado_detectado = valor
+                        elif clave == "venta":
+                            valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
+                            if valor_limpio.replace(".", "", 1).isdigit():
+                                st.session_state.venta_detectada = float(valor_limpio)
+                        elif clave == "quebranto":
+                            valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
+                            test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
+                            if test_val.isdigit():
+                                st.session_state.quebranto_detectado = float(valor_limpio)
                             
-                            if clave == "tienda" and valor in LISTA_TIENDAS:
-                                st.session_state.tienda_detectada = valor
-                            elif clave == "turno":
-                                st.session_state.turno_detectado = "Noche" if "noche" in valor.lower() else "Mañana"
-                            elif clave == "encargado":
-                                st.session_state.encargado_detectado = valor
-                            elif clave == "venta":
-                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                if valor_limpio.replace(".", "", 1).isdigit():
-                                    st.session_state.venta_detectada = float(valor_limpio)
-                            elif clave == "quebranto":
-                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
-                                if test_val.isdigit():
-                                    st.session_state.quebranto_detectado = float(valor_limpio)
-                                
-                    st.success("¡Datos guardados en memoria! Revisa abajo.")
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"Error al analizar la imagen: {e}")
+                st.success("¡Datos guardados en memoria! Revisa abajo.")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error al analizar la imagen: {e}")
 
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
@@ -200,15 +199,19 @@ with pestaña_dueño:
         st.write("Genera un reporte estratégico analizando las desviaciones y rendimientos de las tiendas DP.")
         
         if st.button("📊 Generar Informe con Gemini"):
-            with st.spinner("Analizando métricas y registros con Google Gemini..."):
-                try:
-                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                    datos_texto = df.to_string(index=False)
-                    
-                    prompt_dueño = "Actúa como un Auditor de Finanzas experto en Retail. Analiza estos cierres de caja de nuestras tiendas DP:\n\n" + datos_texto + "\n\nRedacta un informe ejecutivo rápido con: 1. Resumen general de la salud financiera del periodo. 2. Análisis de las alertas críticas detectadas por quebrantos (pérdidas notables o excesos). 3. Recomendación de a qué tiendas o encargados se les debe solicitar una revisión de caja prioritaria. Hazlo directo, profesional y claro para el dueño del negocio."
-                    
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt_dueño
-                    )
-                    
+            try:
+                client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                datos_texto = df.to_string(index=False)
+                
+                prompt_dueño = "Actúa como un Auditor de Finanzas experto en Retail. Analiza estos cierres de caja de nuestras tiendas DP:\n\n" + datos_texto + "\n\nRedacta un informe ejecutivo rápido con: 1. Resumen general de la salud financiera del periodo. 2. Análisis de las alertas críticas detectadas por quebrantos (pérdidas notables o excesos). 3. Recomendación de a qué tiendas o encargados se les debe solicitar una revisión de caja prioritaria. Hazlo directo, profesional y claro para el dueño del negocio."
+                
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt_dueño
+                )
+                
+                st.success("¡Informe generado con éxito!")
+                st.markdown(response.text)
+                
+            except Exception as e:
+                st.error(f"Error al conectar con la IA: {e}")
