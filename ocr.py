@@ -34,8 +34,21 @@ inicializar_bd()
 # Lista oficial de tus 6 tiendas reales
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
-def codificar_imagen(uploaded_file):
-    return base64.b64encode(uploaded_file.read()).decode('utf-8')
+# FUNCIÓN MEJORADA: Comprime la foto al vuelo para evitar el Error 413
+def codificar_y_comprimir_imagen(uploaded_file):
+    # Abrimos la imagen original
+    img = Image.open(uploaded_file)
+    
+    # Si la imagen es gigante, la reducimos a un tamaño manejable (máximo 1000 píxeles)
+    img.thumbnail((1000, 1000))
+    
+    # La guardamos en memoria optimizando el peso al máximo (calidad 70%)
+    buffer = io.BytesIO()
+    img.convert("RGB").save(buffer, format="JPEG", quality=70)
+    buffer.seek(0)
+    
+    # La convertimos a texto Base64 para enviarla de forma ligera
+    return base64.b64encode(buffer.read()).decode('utf-8')
 
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
@@ -47,7 +60,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (Lector de Visión Gratuito)
+# SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("Formulario de Cierre Diario Automático")
@@ -67,7 +80,6 @@ with pestaña_tiendas:
         imagen_pil = Image.open(io.BytesIO(bytes_data))
         st.image(imagen_pil, caption="Imagen cargada correctamente", width=350)
         
-        # Recuperar tu clave sk-or-... guardada en los secretos seguros de la web
         try:
             api_key_segura = st.secrets["OPENAI_API_KEY"]
         except:
@@ -79,10 +91,10 @@ with pestaña_tiendas:
             else:
                 with st.spinner("La Inteligencia Artificial gratuita está analizando la tabla..."):
                     try:
+                        # Reseteamos el puntero y usamos la nueva función de compresión anti-error 413
                         uploaded_file.seek(0)
-                        base64_image = codificar_imagen(uploaded_file)
+                        base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
-                        # Conectamos usando la librería estándar pero apuntando al servidor de OpenRouter
                         cliente_openrouter = openai.OpenAI(
                             base_url="https://openrouter.ai",
                             api_key=api_key_segura
@@ -98,7 +110,6 @@ with pestaña_tiendas:
                         {{"encargado": "Nombre", "venta": 1200.50, "quebranto": -15.20}}
                         """
                         
-                        # Usamos el modelo gratuito e ilimitado de Google en OpenRouter
                         response = cliente_openrouter.chat.completions.create(
                             model="google/gemini-2.5-flash",
                             messages=[
