@@ -77,62 +77,70 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA"):
-            try:
-                img = Image.open(imagen_subida)
-                client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                
-                prompt_ocr = f"""
-                Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
-                
-                REGLAS DE NEGOCIO PARA EXTRACCIÓN EXTRAORDINARIA:
-                1. VENTA TOTAL: Busca el valor de la VENTA TOTAL (bruta/final con impuestos incluidos). IGNORA el campo de "venta neta".
-                2. CIFRAS CENTRADAS O UNIFICADAS: Si observas que una cifra (como la venta o el quebranto) aparece centrada, compartida entre columnas, o en una celda única unificada que aplica a todo el día sin separación física por turnos, interpreta que dicho importe aplica por igual para el turno correspondiente que se está enviando. No pases a la celda o fila errónea del día siguiente.
-                3. CIFRAS SEPARADAS: Si el documento separa explícitamente en celdas o filas distintas la "Mañana" de la "Noche", extrae únicamente el valor específico del turno indicado.
-                
-                Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
-                Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
-                Turno: [Mañana o Noche]
-                Encargado: [Nombre del encargado]
-                Venta: [Número de la venta total sin símbolos]
-                Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
-                """
-                
-                response_ocr = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[img, prompt_ocr]
-                )
-                
-                texto_extraido = response_ocr.text
-                st.info("Datos detectados en la imagen:")
-                st.text(texto_extraido)
-                
-                for linea in texto_extraido.split("\n"):
-                    if ":" in linea:
-                        clave, valor = linea.split(":", 1)
-                        clave = clave.strip().lower()
-                        valor = valor.strip()
-                        
-                        if clave == "tienda" and valor in LISTA_TIENDAS:
-                            st.session_state.tienda_detectada = valor
-                        elif clave == "turno":
-                            st.session_state.turno_detectado = "Noche" if "noche" in valor.lower() else "Mañana"
-                        elif clave == "encargado":
-                            st.session_state.encargado_detectado = valor
-                        elif clave == "venta":
-                            valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                            if valor_limpio.replace(".", "", 1).isdigit():
-                                st.session_state.venta_detectada = float(valor_limpio)
-                        elif clave == "quebranto":
-                            valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                            test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
-                            if test_val.isdigit():
-                                st.session_state.quebranto_detectado = float(valor_limpio)
+            with st.spinner("Analizando detalladamente el recuadro..."):
+                try:
+                    img = Image.open(imagen_subida)
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                    
+                    # REGLAS REFORZADAS CONTRA EL AÑO Y MEZCLA DE ENCARGADOS
+                    prompt_ocr = f"""
+                    Analiza la imagen de este recuadro de caja e identifica el turno ("Mañana" o "Noche").
+                    Extrae estrictamente los siguientes datos basándote en el turno detectado:
+                    
+                    REGLAS OPERATIVAS OBLIGATORIAS:
+                    1. ENCARGADO: Asegúrate de leer el nombre del encargado específico del turno analizado. Si estás procesando la "Noche", busca el nombre escrito en la sección de la noche o en la segunda línea de personal. No pongas el de la mañana.
+                    2. VENTA TOTAL: Busca el valor de la VENTA TOTAL (bruta/final con impuestos). 
+                       - PROHIBIDO EXTRAER EL AÑO: No confundas el año "2025" o "2026" de la fecha con la venta. Si el valor es exactamente igual al año en curso, descártalo y busca la cifra de dinero real.
+                       - IGNORA por completo el campo "venta neta".
+                    3. CIFRAS CENTRADAS: Si una cifra (como la venta o quebranto) está en una celda unificada que abarca todo el día, asígnala por igual a este turno.
+                    
+                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales y sin bloques de código ```:
+                    Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
+                    Turno: [Mañana o Noche]
+                    Encargado: [Nombre del encargado correcto de este turno]
+                    Venta: [Número de la venta total sin símbolos]
+                    Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
+                    """
+                    
+                    response_ocr = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=[img, prompt_ocr]
+                    )
+                    
+                    texto_extraido = response_ocr.text
+                    st.info("Datos detectados en la imagen:")
+                    st.text(texto_extraido)
+                    
+                    for linea in texto_extraido.split("\n"):
+                        if ":" in linea:
+                            clave, valor = linea.split(":", 1)
+                            clave = clave.strip().lower()
+                            valor = valor.strip()
                             
-                st.success("¡Datos guardados en memoria! Revisa abajo.")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Error al analizar la imagen: {e}")
+                            if clave == "tienda" and valor in LISTA_TIENDAS:
+                                st.session_state.tienda_detectada = valor
+                            elif clave == "turno":
+                                st.session_state.turno_detectado = "Noche" if "noche" in valor.lower() else "Mañana"
+                            elif clave == "encargado":
+                                st.session_state.encargado_detectado = valor
+                            elif clave == "venta":
+                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
+                                # Validación extra para descartar el año si la IA se despista
+                                if valor_limpio in ["2025", "2026"]:
+                                    continue
+                                if valor_limpio.replace(".", "", 1).isdigit():
+                                    st.session_state.venta_detectada = float(valor_limpio)
+                            elif clave == "quebranto":
+                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
+                                test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
+                                if test_val.isdigit():
+                                    st.session_state.quebranto_detectado = float(valor_limpio)
+                                
+                    st.success("¡Datos guardados en memoria! Revisa abajo.")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Error al analizar la imagen: {e}")
 
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
@@ -182,12 +190,12 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO AL 100%)
+# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
 # ------------------------------------------
 with pestaña_dueño:
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido al Propietario")
-        st.write("Por favor, introduce tus credenciales para poder ver la tabla de registros y el histórico financiero.")
+        st.write("Por favor, introduce tus credenciales para poder ver la tabla de registros.")
         
         c_log1, c_log2 = st.columns(2)
         with c_log1:
@@ -198,21 +206,5 @@ with pestaña_dueño:
         if st.button("🔓 Entrar al Panel"):
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
                 st.session_state.autenticado = True
-                st.success("¡Autenticación correcta! Cargando datos...")
+                st.success("¡Autenticación correcta!")
                 st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
-    else:
-        # BOTÓN PARA CERRAR SESIÓN Y PROTEGER LA PANTALLA INMEDIATAMENTE
-        if st.button("🔒 Cerrar Sesión (Ocultar Todo)"):
-            st.session_state.autenticado = False
-            st.rerun()
-            
-        st.header("Histórico de Ventas y Quebrantos en Tiempo Real")
-        
-        conn = sqlite3.connect("tiendas.db")
-        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC", conn)
-        conn.close()
-        
-        if df.empty:
-            st.info("Aún no hay datos registrados por las tiendas.")
