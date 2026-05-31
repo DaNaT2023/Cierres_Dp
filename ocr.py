@@ -6,6 +6,19 @@ from google import genai  # Librería oficial de Google
 from PIL import Image     # Para manejar la imagen que subas
 
 # ==========================================
+# 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
+# ==========================================
+# Modifica los nombres entre comillas si necesitas ajustar alguno exactamente
+LISTA_TIENDAS = [
+    "Tienda Centro", 
+    "Tienda Norte", 
+    "Tienda Sur", 
+    "Tienda Este", 
+    "Tienda Oeste", 
+    "Tienda Almacén"
+]
+
+# ==========================================
 # 1. BASE DE DATOS (Se crea sola al arrancar)
 # ==========================================
 def inicializar_bd():
@@ -44,7 +57,6 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    # --- AQUÍ RECUPERAMOS EL BROWSE FILE (SUBIR IMAGEN DEL RECUADRO) ---
     st.subheader("📸 Subir Recuadro Diario")
     imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"])
     
@@ -56,24 +68,20 @@ with pestaña_tiendas:
         if st.button("🔍 Leer Recuadro con IA"):
             with st.spinner("Analizando la foto del recuadro con Gemini..."):
                 try:
-                    # Abrir la imagen con PIL
                     img = Image.open(imagen_subida)
-                    
-                    # Conectar con el cliente de Google
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    # Prompt estricto para extraer datos en formato clave-valor limpia
-                    prompt_ocr = """
+                    # El prompt dinámico le dice a Gemini cuáles son tus tiendas reales
+                    prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
                     Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
-                    Tienda: [Número de tienda, ej: Tienda 1]
+                    Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                     Turno: [Mañana o Noche]
                     Encargado: [Nombre del encargado]
                     Venta: [Número de la venta total sin símbolos]
                     Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
                     """
                     
-                    # Gemini 2.5 Flash procesa texto e imágenes a la vez de forma nativa
                     response_ocr = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=[img, prompt_ocr]
@@ -83,7 +91,6 @@ with pestaña_tiendas:
                     st.info("Datos detectados en la imagen:")
                     st.text(texto_extraido)
                     
-                    # Procesar las líneas de texto para precargar el formulario abajo
                     for linea in texto_extraido.split("\n"):
                         if ":" in linea:
                             clave, valor = linea.split(":", 1)
@@ -97,18 +104,18 @@ with pestaña_tiendas:
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
     
-    # Rellenar inputs con lo que leyó la IA (o vacíos por defecto)
-    tienda_def = datos_automaticos.get("tienda", "Tienda 1")
-    lista_tiendas = [f"Tienda {i}" for i in range(1, 7)]
-    tienda_idx = lista_tiendas.index(tienda_def) if tienda_def in lista_tiendas else 0
+    # Procesar la tienda detectada para preseleccionar el menú desplegable
+    tienda_def = datos_automaticos.get("tienda", LISTA_TIENDAS[0])
+    tienda_idx = LISTA_TIENDAS.index(tienda_def) if tienda_def in LISTA_TIENDAS else 0
     
+    # Procesar el turno detectado
     turno_def = datos_automaticos.get("turno", "Mañana")
     turno_idx = 0 if turno_def.lower() == "mañana" else 1
     
     col_izq, col_der = st.columns(2)
     
     with col_izq:
-        tienda = st.selectbox("Selecciona tu Tienda", lista_tiendas, index=tienda_idx)
+        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx)
         turno = st.radio("Turno Actual", ["Mañana", "Noche"], index=turno_idx)
         encargado = st.text_input("Nombre del Encargado", value=datos_automaticos.get("encargado", ""))
         
