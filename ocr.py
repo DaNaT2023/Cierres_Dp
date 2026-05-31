@@ -69,6 +69,7 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
+    # Selección manual del turno en la parte superior para guiar a la IA
     col_pre1, col_pre2 = st.columns(2)
     with col_pre1:
         turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True)
@@ -85,19 +86,20 @@ with pestaña_tiendas:
                     img = Image.open(imagen_subida)
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
+                    # Prompt optimizado para evitar mezclas espaciales de celdas
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda.
-                    Estamos procesando exclusivamente el turno de la **{turno_seleccionado}**.
+                    Estamos procesando exclusivamente los datos del turno de la: **{turno_seleccionado}**.
                     
-                    REGLAS DE EXTRACCIÓN OBLIGATORIAS:
-                    1. ENCARGADO: Busca la fila o celda correspondiente a la **{turno_seleccionado}** y extrae el nombre de la persona asignada a ese horario. Ignora por completo al encargado del otro turno.
-                    2. VENTA TOTAL: Extrae la cifra de la Venta Total (Bruta, final con IVA) de la fila de la **{turno_seleccionado}**. 
-                       - Si la cifra de la venta está en una celda unificada/centrada que abarca todo el día, extrae esa.
-                       - IGNORA el año de la fecha (2025/2026), no lo confundas con la venta.
-                       - IGNORA la venta neta.
-                    3. QUEBRANTO: Extrae el importe de quebranto de la **{turno_seleccionado}** (si es negativo, mantén el signo menos).
+                    REGLAS DE EXTRACCIÓN MILIMÉTRICA:
+                    1. ENCARGADO: Busca únicamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Descarta por completo el nombre del otro turno.
+                    2. VENTA TOTAL: Extrae el número de la Venta Total Bruta (con IVA, la cifra final acumulada) correspondiente al turno de la **{turno_seleccionado}**. 
+                       - Si la celda de la venta está unificada o centrada abarcando todo el día, toma ese valor único.
+                       - PROHIBIDO confundir la venta con el año actual (2025/2026).
+                       - IGNORA la venta neta o bases imponibles.
+                    3. QUEBRANTO: Extrae el número del quebranto de la **{turno_seleccionado}** (si tiene un signo menos delante, mantén el signo negativo).
                     
-                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales y sin marcas de formato:
+                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni textos extra:
                     Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                     Encargado: [Nombre del encargado de la {turno_seleccionado}]
                     Venta: [Número de la venta total sin símbolos]
@@ -167,7 +169,7 @@ with pestaña_tiendas:
     
     with col_izq:
         tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx)
-        turno = st.radio("Turno Actual", ["Mañana", "Noche"], index=0 if turno_seleccionado == "Mañana" else 1)
+        # ANULADO: Aquí ya no aparece el radio repetido de "Turno Actual", se usa directamente el de arriba
         encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado)
         
     with col_der:
@@ -190,11 +192,11 @@ with pestaña_tiendas:
             cursor.execute("""
                 INSERT INTO recuadros (fecha, tienda, turno, encargado, venta_total, quebranto, estado_alerta)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (fecha.strftime("%Y-%m-%d"), tienda, turno, encargado, venta, quebranto, alerta))
+            """, (fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta, quebranto, alerta))
             conn.commit()
             conn.close()
             
-            st.success(f"¡Datos de {tienda} ({turno}) guardados con éxito!")
+            st.success(f"¡Datos de {tienda} ({turno_seleccionado}) guardados con éxito!")
             
             st.session_state.encargado_detectado = ""
             st.session_state.venta_detectada = 0.0
@@ -207,6 +209,3 @@ with pestaña_tiendas:
 with pestaña_dueño:
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido al Propietario")
-        st.write("Por favor, introduce tus credenciales para ver el histórico y acceder a las funciones de edición.")
-        
-        input_usuario = st.text_input("Usuario", key="login_user")
