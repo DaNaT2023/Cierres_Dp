@@ -1,5 +1,3 @@
 streamlit
 pandas
-pillow
-requests
-together
+google-genai
