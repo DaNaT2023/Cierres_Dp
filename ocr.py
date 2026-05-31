@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-from google import genai
+import google.generativeai as genai  # Librería clásica optimizada para control de cuotas
 from PIL import Image
 
 # ==========================================
@@ -18,7 +18,7 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# Inicializar variables de estado de forma totalmente limpia y controlada
+# Inicializar variables de estado de forma limpia
 if "tienda_detectada" not in st.session_state:
     st.session_state.tienda_detectada = "Dp Valdebebas"
 if "encargado_detectado" not in st.session_state:
@@ -69,7 +69,6 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    # Control superior para el turno
     turno_seleccionado = st.radio(
         "¿Qué turno vas a escanear/subir ahora?", 
         ["Mañana", "Noche"], 
@@ -87,7 +86,10 @@ with pestaña_tiendas:
             with st.spinner(f"Analizando minuciosamente el turno de la {turno_seleccionado}..."):
                 try:
                     img = Image.open(imagen_subida)
-                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                    
+                    # Configuración clásica del cliente de Google
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda.
@@ -108,25 +110,16 @@ with pestaña_tiendas:
                     Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
+                    # Manejo avanzado de cuota y reintentos (Rate Limits)
                     response_ocr = None
-                    intentos = 0
-                    tiempo_espera = 4
-                    
-                    while intentos < 5:
+                    for intento in range(5):
                         try:
-                            response_ocr = client.models.generate_content(
-                                model="gemini-2.5-flash-lite",
-                                contents=[img, prompt_ocr]
-                            )
+                            response_ocr = model.generate_content([img, prompt_ocr])
                             break
                         except Exception as api_error:
-                            if "429" in str(api_error):
-                                intentos += 1
-                                if intentos == 5:
-                                    raise api_error
-                                st.warning(f"Saturación de API (429). Esperando {tiempo_espera} segundos...")
-                                time.sleep(tiempo_espera)
-                                tiempo_espera += 4
+                            if "429" in str(api_error) and intento < 4:
+                                st.warning(f"Google está saturado. Reintentando de forma automática en {5 + intento * 5} segundos...")
+                                time.sleep(5 + intento * 5)
                             else:
                                 raise api_error
                     
@@ -146,8 +139,8 @@ with pestaña_tiendas:
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                # FILTRO CORREGIDO: Filtramos de forma segura descartando solo los años exactos si aparecen
-                                if valor_limpio not in ["2025", "2026"]:
+                                # Filtro de año corregido al 100% de forma limpia
+                                if valor_limpio not in ["2025", "2026", "2025.0", "2026.0"]:
                                     if valor_limpio.replace(".", "", 1).isdigit():
                                         st.session_state.venta_detectada = float(valor_limpio)
                             elif clave == "quebranto":
@@ -203,6 +196,11 @@ with pestaña_tiendas:
             
             st.session_state.encargado_detectado = ""
             st.session_state.venta_detectada = 0.0
-            st.session_state.quebranto_detectada = 0.0
+            st.session_state.quebranto_detectado = 0.0
             st.rerun()
 
+# ------------------------------------------
+# PESTAÑA 2: PANEL DEL PROPIETARIO
+# ------------------------------------------
+with pestaña_dueño:
+    if not st.session_state.autenticado:
