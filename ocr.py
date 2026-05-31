@@ -57,9 +57,9 @@ inicializar_bd()
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
 # ==========================================
-st.set_page_config(page_title="Control General 6 Tiendas DP", layout="wide")
+st.set_page_config(page_title="Panel Cierre Diario Dp 🍕", layout="wide")
 
-st.title("📊 Panel Central de Gestión - 6 Tiendas DP")
+st.title("🍕 Panel Cierre Diario Dp")
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
@@ -179,7 +179,6 @@ with pestaña_tiendas:
 # SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
 # ------------------------------------------
 with pestaña_dueño:
-    # Comprobar si el jefe ya ha iniciado sesión
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido al Propietario")
         st.write("Por favor, introduce tus credenciales para ver el histórico y las opciones de edición.")
@@ -188,7 +187,6 @@ with pestaña_dueño:
         input_password = st.text_input("Contraseña", type="password")
         
         if st.button("🔓 Iniciar Sesión"):
-            # Validación segura contra las variables de los secretos de Streamlit
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
                 st.session_state.autenticado = True
                 st.success("¡Acceso concedido!")
@@ -196,7 +194,6 @@ with pestaña_dueño:
             else:
                 st.error("Usuario o contraseña incorrectos.")
     else:
-        # BOTÓN PARA CERRAR SESIÓN
         if st.button("🔒 Cerrar Sesión del Propietario"):
             st.session_state.autenticado = False
             st.rerun()
@@ -218,11 +215,15 @@ with pestaña_dueño:
             st.markdown("### Tabla Completa de Registros")
             st.dataframe(df, use_container_width=True)
             
-            # --- NUEVA SECCIÓN: EDICIÓN Y BORRADO DE CASILLAS ---
+            # --- SECCIÓN DE EDICIÓN Y BORRADO DE CASILLAS ---
             st.markdown("---")
             st.markdown("### 🛠️ Modificar o Eliminar Registros")
             
-            col_sel, col_acc = st.columns([1, 2])
+            id_seleccionada = st.selectbox("Selecciona la ID del registro a gestionar", df["id"].tolist())
+            fila_editar = df[df["id"] == id_seleccionada].iloc[0]
             
-            with col_sel:
-                # Permitir elegir la ID exacta de la fila que se desea alterar
+            st.write(f"Modificando registro actual de: **{fila_editar['tienda']}** ({fila_editar['fecha']})")
+            
+            col_ed1, col_ed2 = st.columns(2)
+            
+            with col_ed1:
