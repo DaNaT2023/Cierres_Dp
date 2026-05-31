@@ -28,6 +28,8 @@ if "venta_detectada" not in st.session_state:
     st.session_state.venta_detectada = 0.0
 if "quebranto_detectado" not in st.session_state:
     st.session_state.quebranto_detectado = 0.0
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
 
 # ==========================================
 # 1. BASE DE DATOS (Se crea sola al arrancar)
@@ -174,44 +176,53 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
 # ------------------------------------------
 with pestaña_dueño:
-    st.header("Histórico de Ventas y Quebrantos en Tiempo Real")
-    
-    conn = sqlite3.connect("tiendas.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC", conn)
-    conn.close()
-    
-    if df.empty:
-        st.info("Aún no hay datos registrados por las tiendas. Rellena el formulario de la otra pestaña para probar.")
+    # Comprobar si el jefe ya ha iniciado sesión
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido al Propietario")
+        st.write("Por favor, introduce tus credenciales para ver el histórico y las opciones de edición.")
+        
+        input_usuario = st.text_input("Usuario")
+        input_password = st.text_input("Contraseña", type="password")
+        
+        if st.button("🔓 Iniciar Sesión"):
+            # Validación segura contra las variables de los secretos de Streamlit
+            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.success("¡Acceso concedido!")
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
     else:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Ventas Registradas", f"{df['venta_total'].sum():,.2f} €")
-        c2.metric("Balance Total Quebrantos", f"{df['quebranto'].sum():,.2f} €")
-        c3.metric("Alertas Críticas Activas", len(df[df['estado_alerta'] != "OK"]))
+        # BOTÓN PARA CERRAR SESIÓN
+        if st.button("🔒 Cerrar Sesión del Propietario"):
+            st.session_state.autenticado = False
+            st.rerun()
+            
+        st.header("Histórico de Ventas y Quebrantos en Tiempo Real")
         
-        st.markdown("### Tabla Completa de Registros")
-        st.dataframe(df, use_container_width=True)
+        conn = sqlite3.connect("tiendas.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC", conn)
+        conn.close()
         
-        st.markdown("---")
-        st.markdown("### 🤖 Auditoría Automatizada con IA")
-        st.write("Genera un reporte estratégico analizando las desviaciones y rendimientos de las tiendas DP.")
-        
-        if st.button("📊 Generar Informe con Gemini"):
-            try:
-                client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                datos_texto = df.to_string(index=False)
-                
-                prompt_dueño = "Actúa como un Auditor de Finanzas experto en Retail. Analiza estos cierres de caja de nuestras tiendas DP:\n\n" + datos_texto + "\n\nRedacta un informe ejecutivo rápido con: 1. Resumen general de la salud financiera del periodo. 2. Análisis de las alertas críticas detectadas por quebrantos (pérdidas notables o excesos). 3. Recomendación de a qué tiendas o encargados se les debe solicitar una revisión de caja prioritaria. Hazlo directo, profesional y claro para el dueño del negocio."
-                
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt_dueño
-                )
-                
-                st.success("¡Informe generado con éxito!")
-                st.markdown(response.text)
-                
-            except Exception as e:
-                st.error(f"Error al conectar con la IA: {e}")
+        if df.empty:
+            st.info("Aún no hay datos registrados por las tiendas.")
+        else:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Ventas Registradas", f"{df['venta_total'].sum():,.2f} €")
+            c2.metric("Balance Total Quebrantos", f"{df['quebranto'].sum():,.2f} €")
+            c3.metric("Alertas Críticas Activas", len(df[df['estado_alerta'] != "OK"]))
+            
+            st.markdown("### Tabla Completa de Registros")
+            st.dataframe(df, use_container_width=True)
+            
+            # --- NUEVA SECCIÓN: EDICIÓN Y BORRADO DE CASILLAS ---
+            st.markdown("---")
+            st.markdown("### 🛠️ Modificar o Eliminar Registros")
+            
+            col_sel, col_acc = st.columns([1, 2])
+            
+            with col_sel:
+                # Permitir elegir la ID exacta de la fila que se desea alterar
