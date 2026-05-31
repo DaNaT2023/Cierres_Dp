@@ -5,7 +5,7 @@ import datetime
 from PIL import Image
 from together import Together
 import base64
-import json
+import re
 import io
 
 # ==========================================
@@ -80,24 +80,24 @@ with pestaña_tiendas:
             if not api_key_segura:
                 st.error("Falta configurar la clave en los Settings de Streamlit Cloud (dentro de Secrets).")
             else:
-                with st.spinner("La Inteligencia Artificial de alta velocidad está analizando la tabla..."):
+                with st.spinner("La Inteligencia Artificial está procesando la tabla de forma segura..."):
                     try:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
                         client = Together(api_key=api_key_segura)
                         
+                        # Cambiamos el formato a texto plano estricto con etiquetas para no forzar el JSON incompatible
                         prompt_sistema = f"""
-                        Analiza la captura de pantalla de este cierre de caja de un restaurante. 
-                        Identifica la columna o sección correspondiente al turno de la '{turno}' y extrae los datos reales:
-                        - 'encargado': El nombre de la persona o encargado de ese turno específico.
-                        - 'venta': Cifra numérica exacta de la venta total o bruta de ese turno (número plano con decimales, sin letras ni símbolos de euro).
-                        - 'quebranto': Cifra numérica exacta del quebranto o descuadre de ese turno. IMPORTANTE: si en la imagen aparece un signo menos (-) o se indica que es una pérdida, debes devolver el número en negativo obligatoriamente.
-                        Debes devolver estrictamente un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'. No añadas textos adicionales ni bloques markdown.
-                        Ejemplo de formato de salida: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
+                        Analiza esta captura de pantalla de un cierre de caja de un restaurante.
+                        Busca la columna correspondiente al turno de la '{turno}' y extrae la información real.
+                        Devuelve la respuesta estrictamente en estas 3 líneas de texto plano, sin formatos, sin JSON y sin comillas:
+                        encargado: Escribe aquí el nombre de la persona de ese turno
+                        venta: Escribe aquí el número decimal de la venta total (sin el símbolo de euro)
+                        quebranto: Escribe aquí el número decimal del quebranto (con signo menos si es negativo)
                         """
                         
-                        # MODELO CAMBIADO A QWEN VL: Máxima estabilidad y disponibilidad garantizada en servidores comerciales
+                        # Quitamos el parámetro response_format que hacía saltar el Error 400
                         response = client.chat.completions.create(
                             model="Qwen/Qwen2-VL-7B-Instruct",
                             messages=[
@@ -111,21 +111,36 @@ with pestaña_tiendas:
                                         }
                                     ]
                                 }
-                            ],
-                            response_format={"type": "json_object"}
+                            ]
                         )
                         
                         texto_ia = response.choices.message.content
-                        texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
-                        datos_ia = json.loads(texto_ia)
                         
-                        st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
-                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
-                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
-                        st.success("¡Lectura inteligente completada con éxito! Verifica los datos abajo.")
+                        # --- EXTRACTOR DE SEGURIDAD MEDIANTE EXPRESIONES REGULARES ---
+                        encargado_auto = "Desconocido"
+                        venta_auto = 0.0
+                        quebranto_auto = 0.0
+                        
+                        for linea in texto_ia.split("\n"):
+                            linea_baja = linea.lower().strip()
+                            if "encargado:" in linea_baja:
+                                encargado_auto = linea.split(":", 1)[1].strip()
+                            elif "venta:" in linea_baja:
+                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
+                                try: venta_auto = float(num_str.replace(",", "."))
+                                except: pass
+                            elif "quebranto:" in linea_baja:
+                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
+                                try: quebranto_auto = float(num_str.replace(",", "."))
+                                except: pass
+                        
+                        st.session_state['encargado_val'] = encargado_auto
+                        st.session_state['venta_val'] = venta_auto
+                        st.session_state['quebranto_val'] = quebranto_auto
+                        st.success("¡Lectura inteligente completada con éxito!")
                         
                     except Exception as e:
-                        st.error(f"Error en el procesamiento del conector de alta velocidad: {e}")
+                        st.error(f"Fallo en la comunicación con el procesador visual: {e}")
 
         # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
