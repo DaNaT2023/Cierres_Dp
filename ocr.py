@@ -85,10 +85,8 @@ with pestaña_tiendas:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
-                        # Definimos las instrucciones estructuradas en formato JSON estricto
-                        prompt_sistema = f"Analiza la captura de pantalla de este cierre de caja. Busca la sección del turno de la '{turno}' y extrae: el nombre del encargado, la cifra de la venta total (número) y la cifra del quebranto (número, mantén el signo negativo si es una pérdida). Devuelve ÚNICAMENTE un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'."
+                        prompt_sistema = f"Analiza la captura de pantalla de este cierre de caja. Busca la sección del turno de la '{turno}' y extrae de forma exacta: el nombre del encargado, la cifra de la venta total (número plano) y la cifra del quebranto (número plano, mantén el signo negativo si es una pérdida). Devuelve ÚNICAMENTE un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'."
                         
-                        # Preparamos el paquete de datos HTTP nativo para OpenRouter
                         headers = {
                             "Authorization": f"Bearer {api_key_segura}",
                             "Content-Type": "application/json"
@@ -104,20 +102,34 @@ with pestaña_tiendas:
                                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                                     ]
                                 }
-                            ],
-                            "response_format": {"type": "json_object"}
+                            ]
                         }
                         
-                        # Realizamos la petición pura web de forma directa sin usar la librería conflictiva
-                        url_api = "https://openrouter.ai/api/v1/chat/completions"
+                        url_api = "https://openrouter.ai"
                         response = requests.post(url_api, headers=headers, json=payload)
                         response_json = response.json()
                         
-                        # Desempaquetamos la respuesta de forma ultra segura
-                        texto_ia = response_json["choices"][0]["message"]["content"]
+                        # --- DESEMPAQUETADOR INTELIGENTE ANTI-FALLOS ---
+                        texto_ia = ""
+                        
+                        # Buscamos el texto de la IA recorriendo el mapa de la respuesta de forma segura
+                        if "choices" in response_json and len(response_json["choices"]) > 0:
+                            choice = response_json["choices"][0]
+                            if "message" in choice and "content" in choice["message"]:
+                                texto_ia = choice["message"]["content"]
+                        elif "content" in response_json:
+                            texto_ia = response_json["content"]
+                        else:
+                            # Si OpenRouter devuelve el texto directo en la raíz de la respuesta
+                            texto_ia = response.text
+                        
+                        # Limpieza profunda de posibles bloques de código markdown que meta la IA (```json ... ```)
+                        texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
+                        
+                        # Convertimos el texto a datos de Python
                         datos_ia = json.loads(texto_ia)
                         
-                        # Guardamos los resultados reales directamente en el panel
+                        # Inyectamos los datos reales en las casillas correspondientes
                         st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
                         st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
                         st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
@@ -126,7 +138,7 @@ with pestaña_tiendas:
                     except Exception as e:
                         st.error(f"Fallo en la comunicación con el procesador visual: {e}")
 
-        # Recuperar datos extraídos de forma directa
+        # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
         val_venta = st.session_state.get('venta_val', 0.0)
         val_quebranto = st.session_state.get('quebranto_val', 0.0)
