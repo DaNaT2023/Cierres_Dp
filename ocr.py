@@ -20,8 +20,6 @@ LISTA_TIENDAS = [
 # Inicializar variables en el estado de la sesión para evitar fallos de lectura
 if "tienda_detectada" not in st.session_state:
     st.session_state.tienda_detectada = "Dp Valdebebas"
-if "turno_detectado" not in st.session_state:
-    st.session_state.turno_detectado = "Mañana"
 if "encargado_detectado" not in st.session_state:
     st.session_state.encargado_detectado = ""
 if "venta_detectada" not in st.session_state:
@@ -70,6 +68,11 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
+    # RESTAURADO: Selección manual del turno antes de escanear
+    col_pre1, col_pre2 = st.columns(2)
+    with col_pre1:
+        turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True)
+    
     st.subheader("📸 Subir Recuadro Diario")
     imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"])
     
@@ -77,20 +80,28 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA"):
-            with st.spinner("Analizando la foto del recuadro con Gemini..."):
+            with st.spinner(f"Analizando detalladamente el turno de la {turno_seleccionado}..."):
                 try:
                     img = Image.open(imagen_subida)
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    # PROMPT SIMPLIFICADO ORIGINAL PARA EVITAR EL ERROR 429
                     prompt_ocr = f"""
-                    Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
-                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
+                    Analiza la imagen de este recuadro de caja de la tienda.
+                    Estamos procesando exclusivamente el turno de la **{turno_seleccionado}**.
+                    
+                    REGLAS DE EXTRACCIÓN OBLIGATORIAS:
+                    1. ENCARGADO: Busca la fila o celda correspondiente a la **{turno_seleccionado}** y extrae el nombre de la persona asignada a ese horario. Ignora por completo al encargado del otro turno.
+                    2. VENTA TOTAL: Extrae la cifra de la Venta Total (Bruta, final con IVA) de la fila de la **{turno_seleccionado}**. 
+                       - Si la cifra de la venta está en una celda unificada/centrada que abarca todo el día, extrae esa.
+                       - IGNORA el año de la fecha (2025/2026), no lo confundas con la venta.
+                       - IGNORA la venta neta.
+                    3. QUEBRANTO: Extrae el importe de quebranto de la **{turno_seleccionado}** (si es negativo, mantén el signo menos).
+                    
+                    Responde ÚNICAMENTE en este formato exacto, sin textos adicionales y sin marcas de formato:
                     Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
-                    Turno: [Mañana o Noche]
-                    Encargado: [Nombre del encargado]
+                    Encargado: [Nombre del encargado de la {turno_seleccionado}]
                     Venta: [Número de la venta total sin símbolos]
-                    Quebranto: [Número del quebranto, si es negativo mantén el signo menos, sin símbolos]
+                    Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
                     response_ocr = client.models.generate_content(
@@ -110,13 +121,11 @@ with pestaña_tiendas:
                             
                             if clave == "tienda" and valor in LISTA_TIENDAS:
                                 st.session_state.tienda_detectada = valor
-                            elif clave == "turno":
-                                st.session_state.turno_detectado = "Noche" if "noche" in valor.lower() else "Mañana"
                             elif clave == "encargado":
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                if valor_limpio.replace(".", "", 1).isdigit():
+                                if valor_limpio not in ["2025", "2026"] and valor_limpio.replace(".", "", 1).isdigit():
                                     st.session_state.venta_detectada = float(valor_limpio)
                             elif clave == "quebranto":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
@@ -137,13 +146,11 @@ with pestaña_tiendas:
     if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
         
-    turno_idx = 0 if st.session_state.turno_detectado == "Mañana" else 1
-    
     col_izq, col_der = st.columns(2)
     
     with col_izq:
         tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx)
-        turno = st.radio("Turno Actual", ["Mañana", "Noche"], index=turno_idx)
+        turno = st.radio("Turno Actual", ["Mañana", "Noche"], index=0 if turno_seleccionado == "Mañana" else 1)
         encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado)
         
     with col_der:
@@ -206,19 +213,3 @@ with pestaña_dueño:
         st.header("Histórico de Ventas y Quebrantos en Tiempo Real")
         
         conn = sqlite3.connect("tiendas.db")
-        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC", conn)
-        conn.close()
-        
-        if df.empty:
-            st.info("Aún no hay datos registrados por las tiendas.")
-        else:
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total Ventas Registradas", f"{df['venta_total'].sum():,.2f} €")
-            c2.metric("Balance Total Quebrantos", f"{df['quebranto'].sum():,.2f} €")
-            c3.metric("Alertas Críticas Activas", len(df[df['estado_alerta'] != "OK"]))
-            
-            st.markdown("### Tabla Completa de Registros")
-            st.dataframe(df, use_container_width=True)
-            
-            # --- SECCIÓN DE EDICIÓN Y BORRADO DE CASILLAS ---
-            st.markdown("---")
