@@ -90,14 +90,14 @@ with pestaña_tiendas:
                             api_key=api_key_segura
                         )
                         
-                        # Prompt directo para texto plano, evitando problemas de caracteres JSON
+                        # Cambiamos el prompt para que use etiquetas súper claras y fáciles de cazar
                         prompt_sistema = f"""
-                        Analiza esta captura de un recuadro diario de caja de un restaurante.
-                        Busca la columna correspondiente al turno de la '{turno}' y extrae la información.
-                        Devuelve la respuesta estrictamente en estas 3 líneas de texto plano, sin formatos, sin JSON y sin comillas:
-                        encargado: Nombre del encargado aquí
-                        venta: Número con decimales aquí
-                        quebranto: Número con decimales aquí (con signo menos si es negativo)
+                        Analiza esta captura de un recuadro diario de caja.
+                        Busca la columna correspondiente al turno de la '{turno}' y extrae los datos.
+                        Devuelve la respuesta estrictamente en este formato de texto, sustituyendo los ejemplos por los datos reales de la imagen:
+                        [ENCARGADO] Nombre de la persona
+                        [VENTA] Número decimal sin el símbolo de euro
+                        [QUEBRANTO] Número decimal con signo menos si es negativo, o 0 si está a cero
                         """
                         
                         response = cliente_openrouter.chat.completions.create(
@@ -113,34 +113,42 @@ with pestaña_tiendas:
                             ]
                         )
                         
-                        # Extraer texto de la respuesta de forma segura
                         if isinstance(response, str):
                             texto_respuesta = response
                         else:
                             texto_respuesta = response.choices.message.content
                         
-                        # --- EXTRACTOR DE SEGURIDAD MEDIANTE EXPRESIONES REGULARES ---
+                        # --- EXTRACTOR MEJORADO ULTRA FLEXIBLE ---
                         encargado_auto = "Desconocido"
                         venta_auto = 0.0
                         quebranto_auto = 0.0
                         
                         for linea in texto_respuesta.split("\n"):
-                            linea_baja = linea.lower().strip()
-                            if "encargado:" in linea_baja:
-                                encargado_auto = linea.split(":", 1)[1].strip()
-                            elif "venta:" in linea_baja:
-                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
-                                try: venta_auto = float(num_str.replace(",", "."))
-                                except: pass
-                            elif "quebranto:" in linea_baja:
-                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
-                                try: quebranto_auto = float(num_str.replace(",", "."))
-                                except: pass
+                            linea_limpia = linea.strip()
+                            
+                            if "[ENCARGADO]" in linea_limpia:
+                                encargado_auto = linea_limpia.replace("[ENCARGADO]", "").strip()
+                            
+                            elif "[VENTA]" in linea_limpia:
+                                valor_str = linea_limpia.replace("[VENTA]", "").strip()
+                                valor_str = re.sub(r'[^\d.,-]', '', valor_str) # Quita letras o espacios residuales
+                                try:
+                                    venta_auto = float(valor_str.replace(",", "."))
+                                except:
+                                    pass
+                            
+                            elif "[QUEBRANTO]" in linea_limpia:
+                                valor_str = linea_limpia.replace("[QUEBRANTO]", "").strip()
+                                valor_str = re.sub(r'[^\d.,-]', '', valor_str)
+                                try:
+                                    quebranto_auto = float(valor_str.replace(",", "."))
+                                except:
+                                    pass
                         
                         st.session_state['encargado_val'] = encargado_auto
                         st.session_state['venta_val'] = venta_auto
                         st.session_state['quebranto_val'] = quebranto_auto
-                        st.success("¡Lectura completada con éxito!")
+                        st.success("¡Lectura completada! Revisa los datos abajo.")
                         
                     except Exception as e:
                         st.error(f"Error en el procesamiento de la imagen: {e}")
@@ -155,7 +163,7 @@ with pestaña_tiendas:
         
         encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
         venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
-        quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
+        quebranto_final = st.number_input("Quebranto leído (€):", value=val_went_quebranto := val_quebranto, step=0.01, format="%.2f")
         
         if st.button("🚀 Confirmar y Registrar Turno en la Base de Datos"):
             alerta = "OK"
@@ -207,4 +215,3 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
-        st.dataframe(df_mostrar, width="stretch")
