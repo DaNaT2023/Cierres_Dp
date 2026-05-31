@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-import google.generativeai as genai  # Librería clásica optimizada para cuotas
+from google import genai  # Volvemos a tu librería nativa que ya funcionaba
 from PIL import Image
 
 # ==========================================
@@ -83,10 +83,7 @@ with pestaña_tiendas:
             with st.spinner(f"Analizando minuciosamente el turno de la {turno_seleccionado}..."):
                 try:
                     img = Image.open(imagen_subida)
-                    
-                    # Configuración clásica del cliente de Google
-                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda.
@@ -107,14 +104,18 @@ with pestaña_tiendas:
                     Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
+                    # Sistema anticaídas optimizado para el motor moderno
                     response_ocr = None
                     for intento in range(5):
                         try:
-                            response_ocr = model.generate_content([img, prompt_ocr])
+                            response_ocr = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=[img, prompt_ocr]
+                            )
                             break
                         except Exception as api_error:
                             if "429" in str(api_error) and intento < 4:
-                                st.warning(f"Google está saturado. Reintentando automáticamente en {5 + intento * 5} segundos...")
+                                st.warning(f"Google está saturado por ráfaga. Esperando {5 + intento * 5} segundos para liberar tu línea...")
                                 time.sleep(5 + intento * 5)
                             else:
                                 raise api_error
@@ -191,7 +192,7 @@ with pestaña_tiendas:
             
             st.session_state.encargado_detectado = ""
             st.session_state.venta_detectada = 0.0
-            st.session_state.quebranto_detectado = 0.0
+            st.session_state.quebranto_detectada = 0.0
             st.rerun()
 
 # ------------------------------------------
