@@ -87,7 +87,6 @@ with pestaña_tiendas:
                         
                         client = Together(api_key=api_key_segura)
                         
-                        # Cambiamos el formato a texto plano estricto con etiquetas para no forzar el JSON incompatible
                         prompt_sistema = f"""
                         Analiza esta captura de pantalla de un cierre de caja de un restaurante.
                         Busca la columna correspondiente al turno de la '{turno}' y extrae la información real.
@@ -97,9 +96,9 @@ with pestaña_tiendas:
                         quebranto: Escribe aquí el número decimal del quebranto (con signo menos si es negativo)
                         """
                         
-                        # Quitamos el parámetro response_format que hacía saltar el Error 400
+                        # MODELO MODELO VISUAL ESTABLE DE DEEPSEEK ACTIVO EN EL CATÁLOGO COMPARTIDO DE TOGETHER AI
                         response = client.chat.completions.create(
-                            model="Qwen/Qwen2-VL-7B-Instruct",
+                            model="deepseek-ai/Janus-Pro-7B",
                             messages=[
                                 {
                                     "role": "user",
@@ -116,7 +115,7 @@ with pestaña_tiendas:
                         
                         texto_ia = response.choices.message.content
                         
-                        # --- EXTRACTOR DE SEGURIDAD MEDIANTE EXPRESIONES REGULARES ---
+                        # --- EXTRACTOR DE SEGURIDAD FLEXIBLE ---
                         encargado_auto = "Desconocido"
                         venta_auto = 0.0
                         quebranto_auto = 0.0
