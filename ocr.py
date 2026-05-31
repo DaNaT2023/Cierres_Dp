@@ -105,28 +105,28 @@ with pestaña_tiendas:
                     Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
-                    # --- BUCLE DE SEGURIDAD CONTRA EL ERROR 429 ---
+                    # --- CAMBIO ESTRATÉGICO: MODELO LITE Y REINTENTO EXTENDIDO CONTRA ERROR 429 ---
                     response_ocr = None
                     intentos = 0
-                    tiempo_espera = 2  # Segundos iniciales a esperar si falla
+                    tiempo_espera = 4  # Aumentamos el retraso inicial para liberar la cuota de Google
                     
-                    while intentos < 4:
+                    while intentos < 5:
                         try:
                             response_ocr = client.models.generate_content(
-                                model="gemini-2.5-flash",
+                                model="gemini-2.5-flash-lite",  # Modelo Lite optimizado para menor consumo de cuota
                                 contents=[img, prompt_ocr]
                             )
-                            break  # Si tiene éxito, sale del bucle
+                            break
                         except Exception as api_error:
                             if "429" in str(api_error):
                                 intentos += 1
-                                if intentos == 4:
-                                    raise api_error  # Si supera los intentos, arroja el error definitivo
-                                st.warning(f"Límite de Google alcanzado (429). Reintentando lectura automáticamente en {tiempo_espera} segundos...")
+                                if intentos == 5:
+                                    raise api_error
+                                st.warning(f"Saturación de API (429). Esperando {tiempo_espera} segundos para desbloquear el canal...")
                                 time.sleep(tiempo_espera)
-                                tiempo_espera *= 2  # Duplica el tiempo para el siguiente intento
+                                tiempo_espera += 4  # Progresión lineal controlada
                             else:
-                                raise api_error  # Si es otro error diferente, frena
+                                raise api_error
                     
                     texto_extraido = response_ocr.text
                     st.info("Datos detectados en la imagen:")
@@ -205,3 +205,5 @@ with pestaña_tiendas:
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
+# ------------------------------------------
+with pestaña_dueño:
