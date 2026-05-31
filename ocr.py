@@ -97,9 +97,9 @@ with pestaña_tiendas:
                         Ejemplo de formato de salida: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
                         """
                         
-                        # LINEA CORREGIDA: Apuntamos al identificador de producción exacto del modelo vision de Meta
+                        # IDENTIFICADOR CORREGIDO EN MINÚSCULAS: Garantiza la compatibilidad con el servidor
                         response = client.chat.completions.create(
-                            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+                            model="meta-llama/llama-3.2-11b-vision-instruct",
                             messages=[
                                 {
                                     "role": "user",
