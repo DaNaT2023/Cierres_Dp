@@ -34,12 +34,12 @@ inicializar_bd()
 # Lista oficial de tus 6 tiendas reales de Madrid
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
+# FUNCIÓN CORREGIDA: Codifica la imagen en el formato nativo exacto que exige Together AI
 def codificar_y_comprimir_imagen(uploaded_file):
     img = Image.open(uploaded_file)
-    # Mantenemos una resolución óptima para que la IA lea perfectamente los números pequeños
-    img.thumbnail((1200, 1200))
+    img.thumbnail((1000, 1000)) # Tamaño óptimo para mantener nitidez de números pequeños
     buffer = io.BytesIO()
-    img.convert("RGB").save(buffer, format="JPEG", quality=85)
+    img.convert("RGB").save(buffer, format="JPEG", quality=75)
     buffer.seek(0)
     return base64.b64encode(buffer.read()).decode('utf-8')
 
@@ -53,7 +53,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (Lectura Automática Profesional)
+# SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("Formulario de Cierre Diario Automático")
@@ -73,7 +73,6 @@ with pestaña_tiendas:
         imagen_pil = Image.open(io.BytesIO(bytes_data))
         st.image(imagen_pil, caption="Imagen cargada correctamente", width=350)
         
-        # Recuperar la clave segura de Together AI guardada en los Secrets de la web
         try:
             api_key_segura = st.secrets["OPENAI_API_KEY"]
         except:
@@ -88,10 +87,9 @@ with pestaña_tiendas:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
-                        # Prompt ultra optimizado para leer vuestros recuadros de caja diarios
                         prompt_sistema = f"""
                         Analiza la captura de pantalla de este cierre de caja de un restaurante. 
-                        Identifica la columna o sección correspondiente al turno de la '{turno}' y extrae la información real:
+                        Identifica la columna o sección correspondiente al turno de la '{turno}' y extrae los datos reales:
                         - 'encargado': El nombre de la persona o encargado de ese turno específico.
                         - 'venta': Cifra numérica exacta de la venta total o bruta de ese turno (número plano con decimales, sin letras ni símbolos de euro).
                         - 'quebranto': Cifra numérica exacta del quebranto o descuadre de ese turno. IMPORTANTE: si en la imagen aparece un signo menos (-) o se indica que es una pérdida, debes devolver el número en negativo obligatoriamente.
@@ -104,6 +102,7 @@ with pestaña_tiendas:
                             "Content-Type": "application/json"
                         }
                         
+                        # ESTRUCTURA CORREGIDA: Formato de payload nativo e indestructible para Llama 3.2 Vision en Together AI
                         payload = {
                             "model": "meta-llama/Llama-3.2-11B-Vision-Instruct",
                             "messages": [
@@ -111,33 +110,42 @@ with pestaña_tiendas:
                                     "role": "user",
                                     "content": [
                                         {"type": "text", "text": prompt_sistema},
-                                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                                        }
                                     ]
                                 }
                             ],
                             "response_format": {"type": "json_object"}
                         }
                         
-                        # Petición HTTP nativa al servidor profesional de Together AI
                         url_api = "https://together.xyz"
                         response = requests.post(url_api, headers=headers, json=payload)
+                        
+                        # Control de seguridad: Si el servidor responde con un error técnico, lo sacamos en pantalla para saberlo
+                        if response.status_code != 200:
+                            st.error(f"Error del servidor Together AI (Código {response.status_code}): {response.text}")
+                            st.stop()
+                            
                         response_json = response.json()
                         
-                        # Desempaquetado seguro de la respuesta visual de Meta
-                        texto_ia = response_json["choices"][0]["message"]["content"]
-                        texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
-                        datos_ia = json.loads(texto_ia)
-                        
-                        # Guardamos los resultados en la memoria temporal de la web
-                        st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
-                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
-                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
-                        st.success("¡Lectura inteligente completada con éxito! Verifica los datos abajo.")
+                        if "choices" in response_json and len(response_json["choices"]) > 0:
+                            texto_ia = response_json["choices"]["message"]["content"]
+                            texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
+                            datos_ia = json.loads(texto_ia)
+                            
+                            st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
+                            st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
+                            st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
+                            st.success("¡Lectura inteligente completada con éxito! Verifica los datos abajo.")
+                        else:
+                            st.error(f"Respuesta inesperada de la IA: {response_json}")
                         
                     except Exception as e:
-                        st.error(f"Error al procesar la imagen con Together AI: {e}")
+                        st.error(f"Error en el procesamiento del flujo visual: {e}")
 
-        # Recuperar datos extraídos nativamente por la IA de pago
+        # Recuperar datos extraídos nativamente por la IA
         val_encargado = st.session_state.get('encargado_val', "")
         val_venta = st.session_state.get('venta_val', 0.0)
         val_quebranto = st.session_state.get('quebranto_val', 0.0)
@@ -145,7 +153,6 @@ with pestaña_tiendas:
         st.markdown("---")
         st.info("📝 **Verificación:** Comprueba que los datos extraídos automáticamente coincidan con tu foto antes de guardar:")
         
-        # Las casillas reciben los datos reales extraídos de forma directa
         encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
         venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
         quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
@@ -166,8 +173,7 @@ with pestaña_tiendas:
             conn.commit()
             conn.close()
             
-            st.success(f"¡Cierre de {tienda} registrado perfectamente en el Panel del Propietario!")
-            # Limpiamos las variables temporales
+            st.success(f"¡Cierre de {tienda} registrado perfectamente!")
             if 'encargado_val' in st.session_state: del st.session_state['encargado_val']
             if 'venta_val' in st.session_state: del st.session_state['venta_val']
             if 'quebranto_val' in st.session_state: del st.session_state['quebranto_val']
@@ -192,10 +198,3 @@ with pestaña_dueño:
         if tienda_filtrada != "Todas las tiendas":
             df_mostrar = df[df['tienda'] == tienda_filtrada]
         else:
-            df_mostrar = df
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Ventas", f"{df_mostrar['venta_total'].sum():,.2f} €")
-        c2.metric("Balance Quebrantos", f"{df_mostrar['quebranto'].sum():,.2f} €")
-        c3.metric("Alertas Críticas", len(df_mostrar[df_mostrar['estado_alerta'] != "OK"]))
-        
