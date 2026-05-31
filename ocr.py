@@ -17,6 +17,18 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
+# Inicializar variables en el estado de la sesión para evitar fallos de lectura
+if "tienda_detectada" not in st.session_state:
+    st.session_state.tienda_detectada = "Dp Valdebebas"
+if "turno_detectado" not in st.session_state:
+    st.session_state.turno_detectado = "Mañana"
+if "encargado_detectado" not in st.session_state:
+    st.session_state.encargado_detectado = ""
+if "venta_detectada" not in st.session_state:
+    st.session_state.venta_detectada = 0.0
+if "quebranto_detectado" not in st.session_state:
+    st.session_state.quebranto_detectado = 0.0
+
 # ==========================================
 # 1. BASE DE DATOS (Se crea sola al arrancar)
 # ==========================================
@@ -59,8 +71,6 @@ with pestaña_tiendas:
     st.subheader("📸 Subir Recuadro Diario")
     imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"])
     
-    datos_automaticos = {}
-    
     if imagen_subida is not None:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
@@ -70,7 +80,6 @@ with pestaña_tiendas:
                     img = Image.open(imagen_subida)
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    # Prompt dinámico con tus tiendas DP reales exactas
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
                     Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
@@ -90,12 +99,28 @@ with pestaña_tiendas:
                     st.info("Datos detectados en la imagen:")
                     st.text(texto_extraido)
                     
+                    # Mapear datos leídos directamente al estado de la sesión
                     for linea in texto_extraido.split("\n"):
                         if ":" in linea:
                             clave, valor = linea.split(":", 1)
-                            datos_automaticos[clave.strip().lower()] = valor.strip()
+                            clave = clave.strip().lower()
+                            valor = valor.strip()
                             
-                    st.success("¡Datos leídos! Revisa el formulario abajo antes de guardar.")
+                            if clave == "tienda" and valor in LISTA_TIENDAS:
+                                st.session_state.tienda_detectada = valor
+                            elif clave == "turno":
+                                st.session_state.turno_detectado = "Noche" if "noche" in valor.lower() else "Mañana"
+                            elif clave == "encargado":
+                                st.session_state.encargado_detectado = valor
+                            elif clave == "venta":
+                                try: st.session_state.venta_detectada = float(valor)
+                                except: pass
+                            elif clave == "quebranto":
+                                try: st.session_state.quebranto_detectado = float(valor)
+                                except: pass
+                                
+                    st.success("¡Datos guardados en memoria! Revisa abajo.")
+                    st.rerun()  # Forzar recarga limpia de la pantalla para rellenar los inputs
                     
                 except Exception as e:
                     st.error(f"Error al analizar la imagen: {e}")
@@ -103,38 +128,25 @@ with pestaña_tiendas:
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
     
-    # Preselección automática de la tienda DP detectada
-    tienda_def = datos_automaticos.get("tienda", LISTA_TIENDAS[0])
-    tienda_idx = LISTA_TIENDAS.index(tienda_def) if tienda_def in LISTA_TIENDAS else 0
-    
-    # Preselección automática del turno detectado
-    turno_def = datos_automaticos.get("turno", "Mañana")
-    turno_idx = 0 if turno_def.lower() == "mañana" else 1
+    # Calcular los índices basándonos en la memoria de la sesión
+    try: tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
+    except: tienda_idx = 0
+    turno_idx = 0 if st.session_state.turno_detectado == "Mañana" else 1
     
     col_izq, col_der = st.columns(2)
     
     with col_izq:
         tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx)
         turno = st.radio("Turno Actual", ["Mañana", "Noche"], index=turno_idx)
-        encargado = st.text_input("Nombre del Encargado", value=datos_automaticos.get("encargado", ""))
+        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado)
         
     with col_der:
         fecha = st.date_input("Fecha del Recuadro", datetime.date.today())
-        
-        try:
-            venta_val = float(datos_automaticos.get("venta", 0.0))
-        except:
-            venta_val = 0.0
-        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0, value=venta_val)
-        
-        try:
-            quebranto_val = float(datos_automaticos.get("quebranto", 0.0))
-        except:
-            quebranto_val = 0.0
-        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0, value=quebranto_val)
+        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0, value=st.session_state.venta_detectada)
+        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0, value=st.session_state.quebranto_detectado)
 
     if st.button("🚀 Procesar y Guardar Registro"):
-        if encargado == "":
+        if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado.")
         else:
             alerta = "OK"
@@ -153,6 +165,12 @@ with pestaña_tiendas:
             conn.close()
             
             st.success(f"¡Datos de {tienda} ({turno}) guardados con éxito!")
+            
+            # Limpiar el formulario tras guardar correctamente
+            st.session_state.encargado_detectado = ""
+            st.session_state.venta_detectada = 0.0
+            st.session_state.quebranto_detectado = 0.0
+            st.rerun()
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -199,13 +217,3 @@ with pestaña_dueño:
                     Hazlo directo, profesional y claro para el dueño del negocio.
                     """
                     
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt
-                    )
-                    
-                    st.success("¡Informe generado con éxito!")
-                    st.markdown(response.text)
-                    
-                except Exception as e:
-                    st.error(f"Error al conectar con la IA: {e}")
