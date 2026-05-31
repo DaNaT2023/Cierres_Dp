@@ -2,13 +2,14 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
-from PIL import Image, ImageOps
-import easyocr
-import numpy as np
-import re
+from PIL import Image
+import openai
+import base64
+import json
+import io
 
 # ==========================================
-# 1. BASE DE DATOS (SQLite Local)
+# 1. BASE DE DATOS (SQLite Local / Nube)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -33,16 +34,8 @@ inicializar_bd()
 # Lista oficial de tus 6 tiendas reales
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
-# Cargar el lector OCR gratuito optimizando la memoria RAM del servidor
-@st.cache_resource
-def cargar_lector_ocr():
-    # Cargamos el modelo solo para números y letras en español
-    return easyocr.Reader(['es'], gpu=False)
-
-try:
-    reader = cargar_lector_ocr()
-except:
-    reader = None
+def codificar_imagen(uploaded_file):
+    return base64.b64encode(uploaded_file.read()).decode('utf-8')
 
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
@@ -54,7 +47,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (Lectura Automática Eficiente)
+# SECCIÓN: ENVÍO DE TIENDAS (Lector de Visión Gratuito)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("Formulario de Cierre Diario Automático")
@@ -70,76 +63,72 @@ with pestaña_tiendas:
 
     if uploaded_file is not None:
         st.markdown("### 👁️ Vista previa de la captura")
-        imagen_pil = Image.open(uploaded_file)
+        bytes_data = uploaded_file.getvalue()
+        imagen_pil = Image.open(io.BytesIO(bytes_data))
+        st.image(imagen_pil, caption="Imagen cargada correctamente", width=350)
         
-        # --- TRUCO DE PRODUCTIVIDAD: COMPRESIÓN DE IMAGEN ---
-        # Reducimos las dimensiones máximas a 800 píxeles para que consuma un 80% menos de memoria RAM
-        imagen_pil.thumbnail((800, 800))
-        st.image(imagen_pil, caption="Imagen optimizada para lectura automática", width=350)
-        
-        # Variables para almacenar lo que descubra la máquina
-        encargado_detectado = ""
-        venta_detectada = 0.0
-        quebranto_detectado = 0.0
-        
-        if st.button("🔍 Iniciar Lectura Automática con IA Gratuita"):
-            if reader is None:
-                st.error("El lector de imágenes no se ha podido cargar en el servidor gratuito.")
-            else:
-                with st.spinner("Leyendo los números y textos de la foto de forma automática..."):
-                    # Convertir a escala de grises y matriz matemática ligera
-                    img_gris = ImageOps.grayscale(imagen_pil)
-                    imagen_cv = np.array(img_gris)
-                    
-                    # Extraer las líneas de texto de la imagen
-                    resultados_texto = reader.readtext(imagen_cv, detail=0)
-                    texto_limpio = [linea.lower().strip() for linea in resultados_texto]
-                    
-                    # Algoritmo inteligente para buscar datos entre las líneas leídas
-                    for i, linea in enumerate(texto_limpio):
-                        # 1. Buscar el encargado
-                        if "encargado" in linea or "nombre" in linea or "turno por" in linea:
-                            if i + 1 < len(resultados_texto):
-                                encargado_detectado = resultados_texto[i+1].strip()
-                        
-                        # 2. Buscar la venta total (buscando números decimales cerca de la palabra total)
-                        if "total" in linea or "venta" in linea or "visa" in linea:
-                            if i + 1 < len(texto_limpio):
-                                texto_numero = re.sub(r'[^\d.,-]', '', texto_limpio[i+1])
-                                try:
-                                    texto_numero = texto_numero.replace(",", ".")
-                                    venta_detectada = float(texto_numero)
-                                except:
-                                    pass
-                        
-                        # 3. Buscar el quebranto
-                        if "quebranto" in linea or "descuadre" in linea or "diferencia" in linea:
-                            if i + 1 < len(texto_limpio):
-                                texto_quebranto = re.sub(r'[^\d.,-]', '', texto_limpio[i+1])
-                                try:
-                                    texto_quebranto = texto_quebranto.replace(",", ".")
-                                    quebranto_detectado = float(texto_quebranto)
-                                except:
-                                    pass
-                    
-                    # Si no detectó nombre, dejamos uno genérico de la tienda para que lo vean
-                    if encargado_detectado == "": encargado_detectado = "Encargado Detectado"
-                    
-                    # Guardamos provisionalmente en el estado de la web
-                    st.session_state['encargado_auto'] = encargado_detectado
-                    st.session_state['venta_auto'] = venta_detectada
-                    st.session_state['quebranto_auto'] = quebranto_detectado
-                    st.success("¡Lector automático finalizado con éxito!")
+        # Recuperar tu clave sk-or-... guardada en los secretos seguros de la web
+        try:
+            api_key_segura = st.secrets["OPENAI_API_KEY"]
+        except:
+            api_key_segura = None
 
-        # Recuperar los datos extraídos automáticamente
-        val_encargado = st.session_state.get('encargado_auto', "")
-        val_venta = st.session_state.get('venta_auto', 0.0)
-        val_quebranto = st.session_state.get('quebranto_auto', 0.0)
+        if st.button("🔍 Iniciar Lectura Automática Inteligente"):
+            if not api_key_segura:
+                st.error("Falta configurar la clave en los Settings de Streamlit Cloud.")
+            else:
+                with st.spinner("La Inteligencia Artificial gratuita está analizando la tabla..."):
+                    try:
+                        uploaded_file.seek(0)
+                        base64_image = codificar_imagen(uploaded_file)
+                        
+                        # Conectamos usando la librería estándar pero apuntando al servidor de OpenRouter
+                        cliente_openrouter = openai.OpenAI(
+                            base_url="https://openrouter.ai",
+                            api_key=api_key_segura
+                        )
+                        
+                        prompt_sistema = f"""
+                        Analiza esta captura de un recuadro diario de caja de un restaurante.
+                        Busca la columna correspondiente al turno de la '{turno}' y extrae:
+                        1. El nombre del encargado de ese turno específico.
+                        2. El valor numérico de la Venta Total de ese turno.
+                        3. El valor numérico del Quebranto de ese turno (si tiene un signo menos o es negativo, mantén el signo negativo).
+                        Devuelve la respuesta estrictamente en formato JSON plano con esta estructura, sin textos adicionales:
+                        {{"encargado": "Nombre", "venta": 1200.50, "quebranto": -15.20}}
+                        """
+                        
+                        # Usamos el modelo gratuito e ilimitado de Google en OpenRouter
+                        response = cliente_openrouter.chat.completions.create(
+                            model="google/gemini-2.5-flash",
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": prompt_sistema},
+                                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                                    ]
+                                }
+                            ],
+                            response_format={"type": "json_object"}
+                        )
+                        
+                        datos_ia = json.loads(response.choices.message.content)
+                        st.session_state['encargado_val'] = datos_ia.get("encargado", "Desconocido")
+                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
+                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
+                        st.success("¡Lectura completada con éxito!")
+                    except Exception as e:
+                        st.error(f"Error en el servicio de visión artificial gratuito: {e}")
+
+        # Recuperar datos extraídos
+        val_encargado = st.session_state.get('encargado_val', "")
+        val_venta = st.session_state.get('venta_val', 0.0)
+        val_quebranto = st.session_state.get('quebranto_val', 0.0)
         
         st.markdown("---")
-        st.info("📝 **Filtro de seguridad:** Comprueba los datos extraídos automáticamente de tu foto antes de enviarlos a la base de datos:")
+        st.info("📝 **Filtro de seguridad:** Comprueba los datos extraídos automáticamente de tu foto antes de guardarlos:")
         
-        # Se muestran en casillas automáticas rellenas por el OCR. El empleado solo tiene que mirar y darle al botón.
         encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
         venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
         quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
@@ -160,11 +149,10 @@ with pestaña_tiendas:
             conn.commit()
             conn.close()
             
-            st.success(f"¡Los datos automáticos de {tienda} han sido guardados perfectamente!")
-            # Limpiar memoria
-            if 'encargado_auto' in st.session_state: del st.session_state['encargado_auto']
-            if 'venta_auto' in st.session_state: del st.session_state['venta_auto']
-            if 'quebranto_auto' in st.session_state: del st.session_state['quebranto_auto']
+            st.success(f"¡Cierre registrado perfectamente!")
+            if 'encargado_val' in st.session_state: del st.session_state['encargado_val']
+            if 'venta_val' in st.session_state: del st.session_state['venta_val']
+            if 'quebranto_val' in st.session_state: del st.session_state['quebranto_val']
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -196,3 +184,16 @@ with pestaña_dueño:
         st.markdown("---")
         st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
         st.dataframe(df_mostrar, width="stretch")
+        
+        st.markdown("---")
+        with st.expander("⚙️ Zona de Administración (Borrar datos)"):
+            st.warning("Cuidado: Al pulsar el botón eliminarás permanentemente los registros.")
+            id_a_borrar = st.number_input("Introduce el ID del registro que quieres borrar:", min_value=1, step=1)
+            
+            if st.button("🗑️ Borrar este registro único"):
+                conn = sqlite3.connect("tiendas.db")
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM recuadros WHERE id = ?", (id_a_borrar,))
+                conn.commit()
+                conn.close()
+                st.success(f"¡Registro con ID {id_a_borrar} eliminado! Recarga la página.")
