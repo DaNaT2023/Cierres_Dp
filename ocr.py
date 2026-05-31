@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-import google.generativeai as genai  # Librería clásica optimizada para control de cuotas
+import google.generativeai as genai  # Librería clásica optimizada para cuotas
 from PIL import Image
 
 # ==========================================
@@ -18,7 +18,7 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# Inicializar variables de estado de forma limpia
+# Inicializar variables en el estado de la sesión para evitar fallos de lectura
 if "tienda_detectada" not in st.session_state:
     st.session_state.tienda_detectada = "Dp Valdebebas"
 if "encargado_detectado" not in st.session_state:
@@ -54,7 +54,7 @@ def inicializar_bd():
 inicializar_bd()
 
 # ==========================================
-# 2. DISEÑO DE LA INTERFAZ WEB
+# 2. INTERFAZ WEB CON STREAMLIT
 # ==========================================
 st.set_page_config(page_title="Panel Cierre Diario Dp 🍕", layout="wide")
 
@@ -64,17 +64,14 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# PESTAÑA 1: ENVÍO DE TIENDAS
+# SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    turno_seleccionado = st.radio(
-        "¿Qué turno vas a escanear/subir ahora?", 
-        ["Mañana", "Noche"], 
-        horizontal=True, 
-        key="selector_turno_superior"
-    )
+    col_pre1, col_pre2 = st.columns(2)
+    with col_pre1:
+        turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     
     st.subheader("📸 Subir Recuadro Diario")
     imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
@@ -95,22 +92,21 @@ with pestaña_tiendas:
                     Analiza la imagen de este recuadro de caja de la tienda.
                     Estamos procesando el turno de la: **{turno_seleccionado}**.
                     
-                    REGLAS DE EXTRACCIÓN EXTRA ESTRICTAS:
-                    1. ENCARGADO: Extrae única y exclusivamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Desecha por completo el nombre del otro turno.
-                    2. VENTA TOTAL: Busca la cifra de "Venta Total" (importe bruto final acumulado). 
-                       - REGLA DE CENTRADO: Si la casilla o celda de la "Venta Total" se encuentra físicamente centrada o unificada aplicando a todo el día entero (sin divisiones por líneas para mañana y noche), debes usar obligatoriamente ese mismo valor numérico tanto si te pedimos la Mañana como si te pedimos la **{turno_seleccionado}**.
-                       - IGNORA por completo el año de la fecha (como 2025 o 2026), no lo asocies con la venta.
-                       - IGNORA el campo o fila que diga "Venta Neta" o "Base Imponible".
+                    REGLAS DE EXTRACCIÓN SEVERAS:
+                    1. ENCARGADO: Extrae única y exclusivamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Desecha el nombre del otro turno.
+                    2. VENTA TOTAL (REGLA CRÍTICA DE CELDA CENTRADA): 
+                       - Busca la cifra de "Venta Total" (importe bruto final acumulado). 
+                       - IGNORA por completo el campo o fila que diga "Venta Neta" o "Base Imponible".
+                       - REGLA DE CENTRADO: Si la casilla o celda de la "Venta Total" se encuentra físicamente centrada o unificada aplicando a todo el día entero (sin divisiones por líneas para mañana y noche), debes usar obligatoriamente ese mismo valor numérico tanto si te pedimos la Mañana como si te pedimos la **{turno_seleccionado}**. No saltes a otras celdas numéricas ni al año (2025/2026).
                     3. QUEBRANTO: Extrae el número del quebranto asignado a la **{turno_seleccionado}** (si viene con signo menos, mantén el valor negativo).
                     
-                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni textos extra:
+                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni marcas de formato Markdown:
                     Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                     Encargado: [Nombre del encargado de la {turno_seleccionado}]
                     Venta: [Número de la venta total sin símbolos]
                     Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
-                    # Manejo avanzado de cuota y reintentos (Rate Limits)
                     response_ocr = None
                     for intento in range(5):
                         try:
@@ -118,7 +114,7 @@ with pestaña_tiendas:
                             break
                         except Exception as api_error:
                             if "429" in str(api_error) and intento < 4:
-                                st.warning(f"Google está saturado. Reintentando de forma automática en {5 + intento * 5} segundos...")
+                                st.warning(f"Google está saturado. Reintentando automáticamente en {5 + intento * 5} segundos...")
                                 time.sleep(5 + intento * 5)
                             else:
                                 raise api_error
@@ -139,7 +135,6 @@ with pestaña_tiendas:
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                # Filtro de año corregido al 100% de forma limpia
                                 if valor_limpio not in ["2025", "2026", "2025.0", "2026.0"]:
                                     if valor_limpio.replace(".", "", 1).isdigit():
                                         st.session_state.venta_detectada = float(valor_limpio)
@@ -200,7 +195,8 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# PESTAÑA 2: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
 # ------------------------------------------
 with pestaña_dueño:
     if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido al Propietario")
