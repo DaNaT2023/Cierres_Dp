@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
+import time  # Necesario para controlar las pausas de reintento contra el error 429
 from google import genai  # Librería oficial de Google
 from PIL import Image     # Para manejar la imagen que subas
 
@@ -68,7 +69,7 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    # RESTAURADO: Selección manual del turno antes de escanear
+    # SELECCIÓN DE TURNO RESTAURADA
     col_pre1, col_pre2 = st.columns(2)
     with col_pre1:
         turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True)
@@ -80,7 +81,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA"):
-            with st.spinner(f"Analizando detalladamente el turno de la {turno_seleccionado}..."):
+            with st.spinner(f"Analizando minuciosamente el turno de la {turno_seleccionado}..."):
                 try:
                     img = Image.open(imagen_subida)
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
@@ -104,10 +105,28 @@ with pestaña_tiendas:
                     Quebranto: [Número del quebranto de la {turno_seleccionado} sin símbolos]
                     """
                     
-                    response_ocr = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=[img, prompt_ocr]
-                    )
+                    # --- BUCLE DE SEGURIDAD CONTRA EL ERROR 429 ---
+                    response_ocr = None
+                    intentos = 0
+                    tiempo_espera = 2  # Segundos iniciales a esperar si falla
+                    
+                    while intentos < 4:
+                        try:
+                            response_ocr = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=[img, prompt_ocr]
+                            )
+                            break  # Si tiene éxito, sale del bucle
+                        except Exception as api_error:
+                            if "429" in str(api_error):
+                                intentos += 1
+                                if intentos == 4:
+                                    raise api_error  # Si supera los intentos, arroja el error definitivo
+                                st.warning(f"Límite de Google alcanzado (429). Reintentando lectura automáticamente en {tiempo_espera} segundos...")
+                                time.sleep(tiempo_espera)
+                                tiempo_espera *= 2  # Duplica el tiempo para el siguiente intento
+                            else:
+                                raise api_error  # Si es otro error diferente, frena
                     
                     texto_extraido = response_ocr.text
                     st.info("Datos detectados en la imagen:")
@@ -186,30 +205,3 @@ with pestaña_tiendas:
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
-# ------------------------------------------
-with pestaña_dueño:
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido al Propietario")
-        st.write("Por favor, introduce tus credenciales para ver el histórico y acceder a las funciones de edición.")
-        
-        c_log1, c_log2 = st.columns(2)
-        with c_log1:
-            input_usuario = st.text_input("Usuario", key="login_user")
-        with c_log2:
-            input_password = st.text_input("Contraseña", type="password", key="login_pass")
-            
-        if st.button("🔓 Entrar al Panel"):
-            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.success("¡Acceso concedido!")
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
-    else:
-        if st.button("🔒 Cerrar Sesión (Ocultar Todo)"):
-            st.session_state.autenticado = False
-            st.rerun()
-            
-        st.header("Histórico de Ventas y Quebrantos en Tiempo Real")
-        
-        conn = sqlite3.connect("tiendas.db")
