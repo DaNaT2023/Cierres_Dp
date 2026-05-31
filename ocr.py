@@ -3,13 +3,13 @@ import sqlite3
 import pandas as pd
 import datetime
 from PIL import Image
-import openai
+import requests
 import base64
 import json
 import io
 
 # ==========================================
-# 1. BASE DE DATOS (SQLite Local / Nube)
+# 1. BASE DE DATOS (SQLite Local)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -31,7 +31,6 @@ def inicializar_bd():
 
 inicializar_bd()
 
-# Lista oficial de tus 6 tiendas reales
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
 def codificar_y_comprimir_imagen(uploaded_file):
@@ -81,30 +80,23 @@ with pestaña_tiendas:
             if not api_key_segura:
                 st.error("Falta configurar la clave en los Settings de Streamlit Cloud.")
             else:
-                with st.spinner("La Inteligencia Artificial está analizando visualmente la tabla..."):
+                with st.spinner("La Inteligencia Artificial gratuita está procesando la tabla..."):
                     try:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
-                        cliente_openrouter = openai.OpenAI(
-                            base_url="https://openrouter.ai",
-                            api_key=api_key_segura
-                        )
+                        # Definimos las instrucciones estructuradas en formato JSON estricto
+                        prompt_sistema = f"Analiza la captura de pantalla de este cierre de caja. Busca la sección del turno de la '{turno}' y extrae: el nombre del encargado, la cifra de la venta total (número) y la cifra del quebranto (número, mantén el signo negativo si es una pérdida). Devuelve ÚNICAMENTE un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'."
                         
-                        # Modificamos las instrucciones de forma milimétrica para el modelo visual
-                        prompt_sistema = f"""
-                        Eres un asistente experto en auditorías de restaurantes. Analiza la captura del recuadro diario de caja.
-                        Identifica la columna o sección correspondiente al turno de la '{turno}' y extrae la información real:
-                        - 'encargado': El nombre de la persona que lidera ese turno.
-                        - 'venta': La cifra numérica de la Venta Total o Venta Bruta de ese turno (sin letras ni símbolos de euro, solo número plano).
-                        - 'quebranto': La cifra numérica del Quebranto o Descuadre de ese turno. IMPORTANTE: si en la imagen aparece un signo menos (-) o se indica que es una pérdida, debes devolver el número en negativo obligatoriamente.
-                        Debes devolver estrictamente un objeto JSON con esta estructura exacta de ejemplo, sin código markdown secundario:
-                        {{"encargado": "Nombre Real", "venta": 1200.50, "quebranto": -181.38}}
-                        """
+                        # Preparamos el paquete de datos HTTP nativo para OpenRouter
+                        headers = {
+                            "Authorization": f"Bearer {api_key_segura}",
+                            "Content-Type": "application/json"
+                        }
                         
-                        response = cliente_openrouter.chat.completions.create(
-                            model="google/gemini-2.5-flash",
-                            messages=[
+                        payload = {
+                            "model": "google/gemini-2.5-flash",
+                            "messages": [
                                 {
                                     "role": "user",
                                     "content": [
@@ -113,25 +105,28 @@ with pestaña_tiendas:
                                     ]
                                 }
                             ],
-                            # Forzamos por programación que la respuesta de la IA sea obligatoriamente un JSON puro
-                            response_format={"type": "json_object"}
-                        )
+                            "response_format": {"type": "json_object"}
+                        }
                         
-                        # Extraemos el contenido de forma directa y segura
-                        texto_respuesta = response.choices.message.content
+                        # Realizamos la petición pura web de forma directa sin usar la librería conflictiva
+                        url_api = "https://openrouter.ai/api/v1/chat/completions"
+                        response = requests.post(url_api, headers=headers, json=payload)
+                        response_json = response.json()
                         
-                        # Convertimos el texto JSON de la IA en variables de Python de un solo golpe
-                        datos_ia = json.loads(texto_respuesta)
+                        # Desempaquetamos la respuesta de forma ultra segura
+                        texto_ia = response_json["choices"][0]["message"]["content"]
+                        datos_ia = json.loads(texto_ia)
                         
+                        # Guardamos los resultados reales directamente en el panel
                         st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
                         st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
                         st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
-                        st.success("¡Lectura inteligente completada!")
+                        st.success("¡Lectura inteligente completada con éxito!")
                         
                     except Exception as e:
-                        st.error(f"Error en el análisis de la tabla: {e}")
+                        st.error(f"Fallo en la comunicación con el procesador visual: {e}")
 
-        # Recuperar datos extraídos nativamente por la IA
+        # Recuperar datos extraídos de forma directa
         val_encargado = st.session_state.get('encargado_val', "")
         val_venta = st.session_state.get('venta_val', 0.0)
         val_quebranto = st.session_state.get('quebranto_val', 0.0)
@@ -139,7 +134,6 @@ with pestaña_tiendas:
         st.markdown("---")
         st.info("📝 **Verificación:** Comprueba que los datos extraídos automáticamente coincidan con tu foto:")
         
-        # Las casillas ahora reciben el valor de forma directa e indestructible
         encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
         venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
         quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
