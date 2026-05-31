@@ -2,14 +2,10 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
-from PIL import Image
-import requests
-import base64
-import json
-import io
+from google import genai  # Nueva librería oficial de Google
 
 # ==========================================
-# 1. BASE DE DATOS (SQLite Local)
+# 1. BASE DE DATOS (Se crea sola al arrancar)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -31,22 +27,12 @@ def inicializar_bd():
 
 inicializar_bd()
 
-# Lista oficial de tus 6 tiendas reales de Madrid
-LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
-
-def codificar_y_comprimir_imagen(uploaded_file):
-    img = Image.open(uploaded_file)
-    img.thumbnail((1000, 1000))
-    buffer = io.BytesIO()
-    img.convert("RGB").save(buffer, format="JPEG", quality=75)
-    buffer.seek(0)
-    return base64.b64encode(buffer.read()).decode('utf-8')
-
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
 # ==========================================
-st.set_page_config(page_title="Panel Cierres Diarios DP Madrid", page_icon="🍕", layout="wide")
-st.title("🍕 Panel Cierres Diarios DP Madrid")
+st.set_page_config(page_title="Control General 6 Tiendas", layout="wide")
+
+st.title("📊 Panel Central de Gestión - 6 Tiendas")
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
@@ -55,119 +41,40 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 # SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
-    st.header("Formulario de Cierre Diario Automático")
+    st.header("Formulario de Cierre de Turno")
     
-    tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS)
-    turno = st.radio("Turno Actual", ["Mañana", "Noche"], horizontal=True)
-    fecha = st.date_input("Fecha del Recuadro", datetime.date.today())
+    col_izq, col_der = st.columns(2)
     
-    st.markdown("---")
-    st.markdown("### 📸 Sube o haz la foto del recuadro diario")
-    
-    uploaded_file = st.file_uploader("Haz clic para activar la cámara o seleccionar imagen", type=["png", "jpg", "jpeg"])
+    with col_izq:
+        tienda = st.selectbox("Selecciona tu Tienda", [f"Tienda {i}" for i in range(1, 7)])
+        turno = st.radio("Turno Actual", ["Mañana", "Noche"])
+        encargado = st.text_input("Nombre del Encargado (ej: Diego, Naiara)")
+        
+    with col_der:
+        fecha = st.date_input("Fecha del Recuadro", datetime.date.today())
+        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0)
+        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0)
 
-    if uploaded_file is not None:
-        st.markdown("### 👁️ Vista previa de la captura")
-        bytes_data = uploaded_file.getvalue()
-        imagen_pil = Image.open(io.BytesIO(bytes_data))
-        st.image(imagen_pil, caption="Imagen cargada correctamente", width=350)
-        
-        try:
-            api_key_segura = st.secrets["OPENAI_API_KEY"]
-        except:
-            api_key_segura = None
-
-        if st.button("🔍 Iniciar Lectura Automática Inteligente"):
-            if not api_key_segura:
-                st.error("Falta configurar la clave en los Settings de Streamlit Cloud.")
-            else:
-                with st.spinner("La Inteligencia Artificial de Google está analizando el recuadro de forma gratuita..."):
-                    try:
-                        uploaded_file.seek(0)
-                        base64_image = codificar_y_comprimir_imagen(uploaded_file)
-                        
-                        prompt_sistema = f"""
-                        Analiza la captura de pantalla de este cierre de caja. 
-                        Busca la columna correspondiente al turno de la '{turno}' y extrae los datos reales:
-                        - 'encargado': El nombre de la persona o encargado de ese turno.
-                        - 'venta': Cifra numérica exacta de la venta total (número plano con decimales, sin letras ni símbolos).
-                        - 'quebranto': Cifra numérica exacta del quebranto (número plano, mantén el signo menos si es una pérdida).
-                        Devuelve estrictamente un objeto JSON con las llaves 'encargado', 'venta' y 'quebranto'. No añadas textos adicionales ni bloques markdown.
-                        Ejemplo de formato: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
-                        """
-                        
-                        # MUDANZA REALIZADA: Cambiamos la URL de destino al servidor gratuito de Google Gemini
-                        url_api = f"https://googleapis.com{api_key_segura}"
-                        
-                        # Adaptamos el paquete de datos al formato limpio que exige Google
-                        payload = {
-                            "contents": [
-                                {
-                                    "parts": [
-                                        {"text": prompt_sistema},
-                                        {
-                                            "inline_data": {
-                                                "mime_type": "image/jpeg",
-                                                "data": base64_image
-                                            }
-                                        }
-                                    ]
-                                }
-                            ],
-                            "generationConfig": {
-                                "response_mime_type": "application/json"
-                            }
-                        }
-                        
-                        # Hacemos la llamada directa por internet
-                        response = requests.post(url_api, json=payload)
-                        response_json = response.json()
-                        
-                        # Extraemos los datos estructurados devueltos por Google
-                        texto_ia = response_json["candidates"][0]["content"]["parts"][0]["text"]
-                        datos_ia = json.loads(texto_ia.strip())
-                        
-                        # Volcamos el encargado y las cifras en las variables del panel
-                        st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
-                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
-                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
-                        st.success("¡Lectura inteligente completada con éxito!")
-                        
-                    except Exception as e:
-                        st.error(f"Fallo en la comunicación con el procesador visual central: {e}")
-
-        # Recuperar datos extraídos
-        val_encargado = st.session_state.get('encargado_val', "")
-        val_venta = st.session_state.get('venta_val', 0.0)
-        val_quebranto = st.session_state.get('quebranto_val', 0.0)
-        
-        st.markdown("---")
-        st.info("📝 **Verificación:** Comprueba que los datos extraídos automáticamente coincidan con tu foto antes de guardar:")
-        
-        encargado_final = st.text_input("Encargado leído por la máquina:", value=val_encargado)
-        venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
-        quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
-        
-        if st.button("🚀 Confirmar y Registrar Turno en la Base Datos"):
+    if st.button("🚀 Procesar y Guardar Registro"):
+        if encargado == "":
+            st.error("Por favor, introduce el nombre del encargado.")
+        else:
             alerta = "OK"
-            if quebranto_final <= -100:
+            if quebranto <= -100:
                 alerta = "🚨 CRÍTICO (Pérdida)"
-            elif quebranto_final >= 100:
+            elif quebranto >= 100:
                 alerta = "⚠️ ATENCIÓN (Exceso)"
-            
+                
             conn = sqlite3.connect("tiendas.db")
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO recuadros (fecha, tienda, turno, encargado, venta_total, quebranto, estado_alerta)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (fecha.strftime("%Y-%m-%d"), tienda, turno, encargado_final, venta_final, quebranto_final, alerta))
+            """, (fecha.strftime("%Y-%m-%d"), tienda, turno, encargado, venta, quebranto, alerta))
             conn.commit()
             conn.close()
             
-            st.success(f"¡Cierre registrado perfectamente!")
-            if 'encargado_val' in st.session_state: del st.session_state['encargado_val']
-            if 'venta_val' in st.session_state: del st.session_state['venta_val']
-            if 'quebranto_val' in st.session_state: del st.session_state['quebranto_val']
+            st.success(f"¡Datos de {tienda} ({turno}) guardados con éxito!")
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -180,22 +87,57 @@ with pestaña_dueño:
     conn.close()
     
     if df.empty:
-        st.info("Aún no hay datos registrados por las tiendas.")
+        st.info("Aún no hay datos registrados por las tiendas. Rellena el formulario de la otra pestaña para probar.")
     else:
-        st.markdown("### 🔍 Filtros de Búsqueda")
-        opciones_filtro = ["Todas las tiendas"] + LISTA_TIENDAS
-        tienda_filtrada = st.selectbox("Filtrar la información por local:", opciones_filtro)
-        
-        if tienda_filtrada != "Todas las tiendas":
-            df_mostrar = df[df['tienda'] == tienda_filtrada]
-        else:
-            df_mostrar = df
-
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Ventas", f"{df_mostrar['venta_total'].sum():,.2f} €")
-        c2.metric("Balance Quebrantos", f"{df_mostrar['quebranto'].sum():,.2f} €")
-        c3.metric("Alertas Críticas", len(df_mostrar[df_mostrar['estado_alerta'] != "OK"]))
+        c1.metric("Total Ventas Registradas", f"{df['venta_total'].sum():,.2f} €")
+        c2.metric("Balance Total Quebrantos", f"{df['quebranto'].sum():,.2f} €")
+        c3.metric("Alertas Críticas Activas", len(df[df['estado_alerta'] != "OK"]))
         
+        st.markdown("### Tabla Completa de Registros")
+        st.dataframe(df, use_container_width=True)
+        
+        # ------------------------------------------
+        # NUEVA FUNCIÓN: AUDITORÍA CON INTELIGENCIA ARTIFICIAL (GEMINI)
+        # ------------------------------------------
         st.markdown("---")
-        st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
-        st.dataframe(df_mostrar, width="stretch")
+        st.markdown("### 🤖 Auditoría Automatizada con IA")
+        st.write("Genera un reporte estratégico analizando las desviaciones y rendimientos de las 6 tiendas.")
+        
+        if st.button("📊 Generar Informe con Gemini"):
+            with st.spinner("Analizando métricas y registros con Google Gemini..."):
+                try:
+                    # Inicializamos el cliente oficial de Google usando la clave de tus Secrets
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                    
+                    # Convertimos los últimos datos a texto para que la IA los procese
+                    datos_texto = df.to_string(index=False)
+                    
+                    # Creamos un prompt específico para el negocio
+                    prompt = f"""
+                    Actúa como un Auditor de Finanzas y Operaciones experto en Retail. 
+                    Analiza los siguientes registros de cierre de caja de nuestra cadena de 6 tiendas:
+                    
+                    {datos_texto}
+                    
+                    Por favor, redacta un informe ejecutivo rápido con:
+                    1. Resumen general de la salud financiera del día o periodo.
+                    2. Análisis de las alertas críticas detectadas por quebrantos (pérdidas notables o excesos inexplicables).
+                    3. Recomendación de a qué tiendas o encargados se les debe solicitar una revisión de caja de forma prioritaria.
+                    
+                    Hazlo directo, profesional y claro para el dueño del negocio.
+                    """
+                    
+                    # Llamada directa al modelo gratuito y rápido gemini-2.5-flash
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
+                    
+                    # Mostramos el resultado limpio en pantalla
+                    st.success("¡Informe generado con éxito!")
+                    st.markdown(response.text)
+                    
+                except Exception as e:
+                    st.error(f"Error al conectar con la IA: {e}")
+                    st.info("Asegúrate de haber guardado exactamente 'GEMINI_API_KEY' en la pestaña de Secrets en Streamlit.")
