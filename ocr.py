@@ -3,9 +3,9 @@ import sqlite3
 import pandas as pd
 import datetime
 from PIL import Image
-from together import Together
+import requests
 import base64
-import re
+import json
 import io
 
 # ==========================================
@@ -31,6 +31,7 @@ def inicializar_bd():
 
 inicializar_bd()
 
+# Lista oficial de tus 6 tiendas reales de Madrid
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
 def codificar_y_comprimir_imagen(uploaded_file):
@@ -78,68 +79,62 @@ with pestaña_tiendas:
 
         if st.button("🔍 Iniciar Lectura Automática Inteligente"):
             if not api_key_segura:
-                st.error("Falta configurar la clave en los Settings de Streamlit Cloud (dentro de Secrets).")
+                st.error("Falta configurar la clave en los Settings de Streamlit Cloud.")
             else:
-                with st.spinner("La Inteligencia Artificial está procesando la tabla de forma segura..."):
+                with st.spinner("La Inteligencia Artificial de Google está analizando el recuadro de forma gratuita..."):
                     try:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
-                        client = Together(api_key=api_key_segura)
-                        
                         prompt_sistema = f"""
-                        Analiza esta captura de pantalla de un cierre de caja de un restaurante.
-                        Busca la columna correspondiente al turno de la '{turno}' y extrae la información real.
-                        Devuelve la respuesta estrictamente en estas 3 líneas de texto plano, sin formatos, sin JSON y sin comillas:
-                        encargado: Escribe aquí el nombre de la persona de ese turno
-                        venta: Escribe aquí el número decimal de la venta total (sin el símbolo de euro)
-                        quebranto: Escribe aquí el número decimal del quebranto (con signo menos si es negativo)
+                        Analiza la captura de pantalla de este cierre de caja. 
+                        Busca la columna correspondiente al turno de la '{turno}' y extrae los datos reales:
+                        - 'encargado': El nombre de la persona o encargado de ese turno.
+                        - 'venta': Cifra numérica exacta de la venta total (número plano con decimales, sin letras ni símbolos).
+                        - 'quebranto': Cifra numérica exacta del quebranto (número plano, mantén el signo menos si es una pérdida).
+                        Devuelve estrictamente un objeto JSON con las llaves 'encargado', 'venta' y 'quebranto'. No añadas textos adicionales ni bloques markdown.
+                        Ejemplo de formato: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
                         """
                         
-                        # MODELO MODELO VISUAL ESTABLE DE DEEPSEEK ACTIVO EN EL CATÁLOGO COMPARTIDO DE TOGETHER AI
-                        response = client.chat.completions.create(
-                            model="deepseek-ai/Janus-Pro-7B",
-                            messages=[
+                        # MUDANZA REALIZADA: Cambiamos la URL de destino al servidor gratuito de Google Gemini
+                        url_api = f"https://googleapis.com{api_key_segura}"
+                        
+                        # Adaptamos el paquete de datos al formato limpio que exige Google
+                        payload = {
+                            "contents": [
                                 {
-                                    "role": "user",
-                                    "content": [
-                                        {"type": "text", "text": prompt_sistema},
+                                    "parts": [
+                                        {"text": prompt_sistema},
                                         {
-                                            "type": "image_url",
-                                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                                            "inline_data": {
+                                                "mime_type": "image/jpeg",
+                                                "data": base64_image
+                                            }
                                         }
                                     ]
                                 }
-                            ]
-                        )
+                            ],
+                            "generationConfig": {
+                                "response_mime_type": "application/json"
+                            }
+                        }
                         
-                        texto_ia = response.choices.message.content
+                        # Hacemos la llamada directa por internet
+                        response = requests.post(url_api, json=payload)
+                        response_json = response.json()
                         
-                        # --- EXTRACTOR DE SEGURIDAD FLEXIBLE ---
-                        encargado_auto = "Desconocido"
-                        venta_auto = 0.0
-                        quebranto_auto = 0.0
+                        # Extraemos los datos estructurados devueltos por Google
+                        texto_ia = response_json["candidates"][0]["content"]["parts"][0]["text"]
+                        datos_ia = json.loads(texto_ia.strip())
                         
-                        for linea in texto_ia.split("\n"):
-                            linea_baja = linea.lower().strip()
-                            if "encargado:" in linea_baja:
-                                encargado_auto = linea.split(":", 1)[1].strip()
-                            elif "venta:" in linea_baja:
-                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
-                                try: venta_auto = float(num_str.replace(",", "."))
-                                except: pass
-                            elif "quebranto:" in linea_baja:
-                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
-                                try: quebranto_auto = float(num_str.replace(",", "."))
-                                except: pass
-                        
-                        st.session_state['encargado_val'] = encargado_auto
-                        st.session_state['venta_val'] = venta_auto
-                        st.session_state['quebranto_val'] = quebranto_auto
+                        # Volcamos el encargado y las cifras en las variables del panel
+                        st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
+                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
+                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
                         st.success("¡Lectura inteligente completada con éxito!")
                         
                     except Exception as e:
-                        st.error(f"Fallo en la comunicación con el procesador visual: {e}")
+                        st.error(f"Fallo en la comunicación con el procesador visual central: {e}")
 
         # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
@@ -169,7 +164,7 @@ with pestaña_tiendas:
             conn.commit()
             conn.close()
             
-            st.success(f"¡Cierre de {tienda} registrado perfectamente!")
+            st.success(f"¡Cierre registrado perfectamente!")
             if 'encargado_val' in st.session_state: del st.session_state['encargado_val']
             if 'venta_val' in st.session_state: del st.session_state['venta_val']
             if 'quebranto_val' in st.session_state: del st.session_state['quebranto_val']
