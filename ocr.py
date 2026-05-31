@@ -6,16 +6,15 @@ from google import genai  # Librería oficial de Google
 from PIL import Image     # Para manejar la imagen que subas
 
 # ==========================================
-# 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
+# 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
 # ==========================================
-# Modifica los nombres entre comillas si necesitas ajustar alguno exactamente
 LISTA_TIENDAS = [
-    "Tienda Centro", 
-    "Tienda Norte", 
-    "Tienda Sur", 
-    "Tienda Este", 
-    "Tienda Oeste", 
-    "Tienda Almacén"
+    "Dp Valdebebas",
+    "Dp Collado",
+    "Dp Paracuellos",
+    "Dp Villanueva",
+    "Dp Galapagar",
+    "Dp Vicálvaro"
 ]
 
 # ==========================================
@@ -44,9 +43,9 @@ inicializar_bd()
 # ==========================================
 # 2. INTERFAZ WEB CON STREAMLIT
 # ==========================================
-st.set_page_config(page_title="Control General 6 Tiendas", layout="wide")
+st.set_page_config(page_title="Control General 6 Tiendas DP", layout="wide")
 
-st.title("📊 Panel Central de Gestión - 6 Tiendas")
+st.title("📊 Panel Central de Gestión - 6 Tiendas DP")
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
@@ -71,7 +70,7 @@ with pestaña_tiendas:
                     img = Image.open(imagen_subida)
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    # El prompt dinámico le dice a Gemini cuáles son tus tiendas reales
+                    # Prompt dinámico con tus tiendas DP reales exactas
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
                     Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
@@ -104,11 +103,11 @@ with pestaña_tiendas:
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
     
-    # Procesar la tienda detectada para preseleccionar el menú desplegable
+    # Preselección automática de la tienda DP detectada
     tienda_def = datos_automaticos.get("tienda", LISTA_TIENDAS[0])
     tienda_idx = LISTA_TIENDAS.index(tienda_def) if tienda_def in LISTA_TIENDAS else 0
     
-    # Procesar el turno detectado
+    # Preselección automática del turno detectado
     turno_def = datos_automaticos.get("turno", "Mañana")
     turno_idx = 0 if turno_def.lower() == "mañana" else 1
     
@@ -178,7 +177,7 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.markdown("### 🤖 Auditoría Automatizada con IA")
-        st.write("Genera un reporte estratégico analizando las desviaciones y rendimientos de las 6 tiendas.")
+        st.write("Genera un reporte estratégico analizando las desviaciones y rendimientos de las tiendas DP.")
         
         if st.button("📊 Generar Informe con Gemini"):
             with st.spinner("Analizando métricas y registros con Google Gemini..."):
@@ -188,7 +187,7 @@ with pestaña_dueño:
                     
                     prompt = f"""
                     Actúa como un Auditor de Finanzas y Operaciones experto en Retail. 
-                    Analiza los siguientes registros de cierre de caja de nuestra cadena de 6 tiendas:
+                    Analiza los siguientes registros de cierre de caja de nuestra cadena de tiendas DP:
                     
                     {datos_texto}
                     
