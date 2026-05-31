@@ -99,7 +99,7 @@ with pestaña_tiendas:
                     st.info("Datos detectados en la imagen:")
                     st.text(texto_extraido)
                     
-                    # Mapear datos leídos corrigiendo los bloques try/except hacia abajo
+                    # Mapear datos leídos de forma ultra segura sin try/except anidados
                     for linea in texto_extraido.split("\n"):
                         if ":" in linea:
                             clave, valor = linea.split(":", 1)
@@ -113,15 +113,15 @@ with pestaña_tiendas:
                             elif clave == "encargado":
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
-                                try:
-                                    st.session_state.venta_detectada = float(valor)
-                                except:
-                                    pass
+                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
+                                if valor_limpio.replace(".", "", 1).isdigit():
+                                    st.session_state.venta_detectada = float(valor_limpio)
                             elif clave == "quebranto":
-                                try:
-                                    st.session_state.quebranto_detectado = float(valor)
-                                except:
-                                    pass
+                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
+                                # Permite números negativos para las pérdidas
+                                test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
+                                if test_val.isdigit():
+                                    st.session_state.quebranto_detectado = float(valor_limpio)
                                 
                     st.success("¡Datos guardados en memoria! Revisa abajo.")
                     st.rerun()
@@ -132,10 +132,10 @@ with pestaña_tiendas:
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
     
-    try:
+    # Calcular los índices de manera segura
+    tienda_idx = 0
+    if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
-    except:
-        tienda_idx = 0
         
     turno_idx = 0 if st.session_state.turno_detectado == "Mañana" else 1
     
@@ -210,16 +210,10 @@ with pestaña_dueño:
                     datos_texto = df.to_string(index=False)
                     
                     prompt = f"""
-                    Actúa como un Auditor de Finanzas y Operations experto en Retail. 
+                    Actúa como un Auditor de Finanzas y Operaciones experto en Retail. 
                     Analiza los siguientes registros de cierre de caja de nuestra cadena de tiendas DP:
                     
                     {datos_texto}
                     
                     Por favor, redacta un informe ejecutivo rápido con:
                     1. Resumen general de la salud financiera del día o periodo.
-                    2. Análisis de las alertas críticas detectadas por quebrantos (pérdidas notables o excesos inexplicables).
-                    3. Recomendación de a qué tiendas o encargados se les debe solicitar una revisión de caja de forma prioritaria.
-                    
-                    Hazlo directo, profesional y claro para el dueño del negocio.
-                    """
-                    
