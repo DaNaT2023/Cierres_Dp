@@ -146,11 +146,10 @@ with pestaña_tiendas:
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                if valor_limpio.replace(".", "", 1).isdigit():
-                                    num_venta = float(valor_limpio)
-                                    # FILTRO INTELIGENTE: Si el número de la venta es menor a 2030, descartamos que sea el año
-                                    if num_venta > 2030:
-                                        st.session_state.venta_detectada = num_venta
+                                # FILTRO CORREGIDO: Filtramos de forma segura descartando solo los años exactos si aparecen
+                                if valor_limpio not in ["2025", "2026"]:
+                                    if valor_limpio.replace(".", "", 1).isdigit():
+                                        st.session_state.venta_detectada = float(valor_limpio)
                             elif clave == "quebranto":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
                                 test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
@@ -204,4 +203,6 @@ with pestaña_tiendas:
             
             st.session_state.encargado_detectado = ""
             st.session_state.venta_detectada = 0.0
-            st.session_state.quebranto_detectado = 0.0
+            st.session_state.quebranto_detectada = 0.0
+            st.rerun()
+
