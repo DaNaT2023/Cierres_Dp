@@ -99,7 +99,7 @@ with pestaña_tiendas:
                     st.info("Datos detectados en la imagen:")
                     st.text(texto_extraido)
                     
-                    # Mapear datos leídos directamente al estado de la sesión
+                    # Mapear datos leídos corrigiendo los bloques try/except hacia abajo
                     for linea in texto_extraido.split("\n"):
                         if ":" in linea:
                             clave, valor = linea.split(":", 1)
@@ -113,14 +113,18 @@ with pestaña_tiendas:
                             elif clave == "encargado":
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
-                                try: st.session_state.venta_detectada = float(valor)
-                                except: pass
+                                try:
+                                    st.session_state.venta_detectada = float(valor)
+                                except:
+                                    pass
                             elif clave == "quebranto":
-                                try: st.session_state.quebranto_detectado = float(valor)
-                                except: pass
+                                try:
+                                    st.session_state.quebranto_detectado = float(valor)
+                                except:
+                                    pass
                                 
                     st.success("¡Datos guardados en memoria! Revisa abajo.")
-                    st.rerun()  # Forzar recarga limpia de la pantalla para rellenar los inputs
+                    st.rerun()
                     
                 except Exception as e:
                     st.error(f"Error al analizar la imagen: {e}")
@@ -128,9 +132,11 @@ with pestaña_tiendas:
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
     
-    # Calcular los índices basándonos en la memoria de la sesión
-    try: tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
-    except: tienda_idx = 0
+    try:
+        tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
+    except:
+        tienda_idx = 0
+        
     turno_idx = 0 if st.session_state.turno_detectado == "Mañana" else 1
     
     col_izq, col_der = st.columns(2)
@@ -204,7 +210,7 @@ with pestaña_dueño:
                     datos_texto = df.to_string(index=False)
                     
                     prompt = f"""
-                    Actúa como un Auditor de Finanzas y Operaciones experto en Retail. 
+                    Actúa como un Auditor de Finanzas y Operations experto en Retail. 
                     Analiza los siguientes registros de cierre de caja de nuestra cadena de tiendas DP:
                     
                     {datos_texto}
