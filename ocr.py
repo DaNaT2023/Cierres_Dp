@@ -1,4 +1,4 @@
-import streamlit as st
+iimport streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
@@ -69,7 +69,6 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    # Selección manual del turno en la parte superior para guiar a la IA
     col_pre1, col_pre2 = st.columns(2)
     with col_pre1:
         turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True)
@@ -86,20 +85,20 @@ with pestaña_tiendas:
                     img = Image.open(imagen_subida)
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    # Prompt optimizado para evitar mezclas espaciales de celdas
+                    # PROMPT REFORZADO CON LA REGLA DE LA CELDA BRUTA CENTRADA
                     prompt_ocr = f"""
                     Analiza la imagen de este recuadro de caja de la tienda.
-                    Estamos procesando exclusivamente los datos del turno de la: **{turno_seleccionado}**.
+                    Estamos procesando el turno de la: **{turno_seleccionado}**.
                     
-                    REGLAS DE EXTRACCIÓN MILIMÉTRICA:
-                    1. ENCARGADO: Busca únicamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Descarta por completo el nombre del otro turno.
-                    2. VENTA TOTAL: Extrae el número de la Venta Total Bruta (con IVA, la cifra final acumulada) correspondiente al turno de la **{turno_seleccionado}**. 
-                       - Si la celda de la venta está unificada o centrada abarcando todo el día, toma ese valor único.
-                       - PROHIBIDO confundir la venta con el año actual (2025/2026).
-                       - IGNORA la venta neta o bases imponibles.
-                    3. QUEBRANTO: Extrae el número del quebranto de la **{turno_seleccionado}** (si tiene un signo menos delante, mantén el signo negativo).
+                    REGLAS DE EXTRACCIÓN SEVERAS:
+                    1. ENCARGADO: Extrae única y exclusivamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Desecha el nombre del otro turno.
+                    2. VENTA TOTAL (REGLA CRÍTICA DE CELDA CENTRADA): 
+                       - Busca la cifra de "Venta Total" (importe bruto final acumulado). 
+                       - IGNORA por completo el campo o fila que diga "Venta Neta" o "Base Imponible".
+                       - REGLA DE CENTRADO: Si la casilla o celda de la "Venta Total" se encuentra físicamente centrada o unificada aplicando a todo el día entero (sin divisiones por líneas para mañana y noche), debes usar obligatoriamente ese mismo valor numérico tanto si te pedimos la Mañana como si te pedimos la **{turno_seleccionado}**. No saltes a otras celdas numéricas ni al año (2025/2026).
+                    3. QUEBRANTO: Extrae el número del quebranto asignado a la **{turno_seleccionado}** (si viene con signo menos, mantén el valor negativo).
                     
-                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni textos extra:
+                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni marcas de formato Markdown:
                     Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                     Encargado: [Nombre del encargado de la {turno_seleccionado}]
                     Venta: [Número de la venta total sin símbolos]
@@ -169,7 +168,6 @@ with pestaña_tiendas:
     
     with col_izq:
         tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx)
-        # ANULADO: Aquí ya no aparece el radio repetido de "Turno Actual", se usa directamente el de arriba
         encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado)
         
     with col_der:
@@ -208,4 +206,3 @@ with pestaña_tiendas:
 # ------------------------------------------
 with pestaña_dueño:
     if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido al Propietario")
