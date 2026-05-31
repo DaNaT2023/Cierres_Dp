@@ -3,13 +3,13 @@ import sqlite3
 import pandas as pd
 import datetime
 from PIL import Image
-import requests
+from together import Together
 import base64
 import json
 import io
 
 # ==========================================
-# 1. BASE DE DATOS (SQLite Local / Nube)
+# 1. BASE DE DATOS (SQLite Local)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -31,7 +31,6 @@ def inicializar_bd():
 
 inicializar_bd()
 
-# Lista oficial de tus 6 tiendas reales de Madrid
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
 def codificar_y_comprimir_imagen(uploaded_file):
@@ -86,26 +85,23 @@ with pestaña_tiendas:
                         uploaded_file.seek(0)
                         base64_image = codificar_y_comprimir_imagen(uploaded_file)
                         
+                        # Inicializamos el cliente oficial con la librería del sistema de pago
+                        client = Together(api_key=api_key_segura)
+                        
                         prompt_sistema = f"""
                         Analiza la captura de pantalla de este cierre de caja de un restaurante. 
                         Identifica la columna o sección correspondiente al turno de la '{turno}' y extrae los datos reales:
                         - 'encargado': El nombre de la persona o encargado de ese turno específico.
                         - 'venta': Cifra numérica exacta de la venta total o bruta de ese turno (número plano con decimales, sin letras ni símbolos de euro).
                         - 'quebranto': Cifra numérica exacta del quebranto o descuadre de ese turno. IMPORTANTE: si en la imagen aparece un signo menos (-) o se indica que es una pérdida, debes devolver el número en negativo obligatoriamente.
-                        Devuelve estrictamente un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'. No añadas textos adicionales ni bloques markdown.
+                        Debes devolver estrictamente un objeto JSON plano con las llaves 'encargado', 'venta' y 'quebranto'. No añadas textos adicionales ni bloques markdown.
                         Ejemplo de formato de salida: {{"encargado": "Diego", "venta": 1200.50, "quebranto": -181.38}}
                         """
                         
-                        # CABECERA BLINDADA: Añadimos User-Agent para identificarnos como un navegador real y saltarnos el bloqueo 403
-                        headers = {
-                            "Authorization": f"Bearer {api_key_segura}",
-                            "Content-Type": "application/json",
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                        }
-                        
-                        payload = {
-                            "model": "meta-llama/Llama-3.2-11B-Vision-Instruct",
-                            "messages": [
+                        # Solicitud nativa y cifrada a través del conector oficial de Together
+                        response = client.chat.completions.create(
+                            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+                            messages=[
                                 {
                                     "role": "user",
                                     "content": [
@@ -116,35 +112,23 @@ with pestaña_tiendas:
                                         }
                                     ]
                                 }
-                            ]
-                        }
+                            ],
+                            response_format={"type": "json_object"}
+                        )
                         
-                        url_api = "https://together.xyz"
-                        response = requests.post(url_api, headers=headers, json=payload)
+                        texto_ia = response.choices[0].message.content
+                        texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
+                        datos_ia = json.loads(texto_ia)
                         
-                        if response.status_code != 200:
-                            st.error(f"Error del servidor (Código {response.status_code}): {response.text}")
-                            st.stop()
-                            
-                        response_json = response.json()
-                        
-                        # Desempaquetado seguro adaptado a la API de Together
-                        if "choices" in response_json and len(response_json["choices"]) > 0:
-                            texto_ia = response_json["choices"][0]["message"]["content"]
-                            texto_ia = texto_ia.replace("```json", "").replace("```", "").strip()
-                            datos_ia = json.loads(texto_ia)
-                            
-                            st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
-                            st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
-                            st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
-                            st.success("¡Lectura inteligente completada con éxito! Verifica los datos abajo.")
-                        else:
-                            st.error(f"Respuesta inesperada de la IA: {response_json}")
+                        st.session_state['encargado_val'] = str(datos_ia.get("encargado", "Desconocido"))
+                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
+                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
+                        st.success("¡Lectura inteligente completada con éxito! Verifica los datos abajo.")
                         
                     except Exception as e:
-                        st.error(f"Error en el procesamiento del flujo visual: {e}")
+                        st.error(f"Error en el procesamiento del conector oficial: {e}")
 
-        # Recuperar datos extraídos nativamente por la IA
+        # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
         val_venta = st.session_state.get('venta_val', 0.0)
         val_quebranto = st.session_state.get('quebranto_val', 0.0)
@@ -156,7 +140,7 @@ with pestaña_tiendas:
         venta_final = st.number_input("Venta Total leída (€):", value=val_venta, min_value=0.0, step=0.01, format="%.2f")
         quebranto_final = st.number_input("Quebranto leído (€):", value=val_quebranto, step=0.01, format="%.2f")
         
-        if st.button("🚀 Confirmar y Registrar Turno en la Base de Datos"):
+        if st.button("🚀 Confirmar y Registrar Turno en la Base Datos"):
             alerta = "OK"
             if quebranto_final <= -100:
                 alerta = "🚨 CRÍTICO (Pérdida)"
@@ -200,3 +184,10 @@ with pestaña_dueño:
             df_mostrar = df
 
         c1, c2, c3 = st.columns(3)
+        c1.metric("Total Ventas", f"{df_mostrar['venta_total'].sum():,.2f} €")
+        c2.metric("Balance Quebrantos", f"{df_mostrar['quebranto'].sum():,.2f} €")
+        c3.metric("Alertas Críticas", len(df_mostrar[df_mostrar['estado_alerta'] != "OK"]))
+        
+        st.markdown("---")
+        st.markdown(f"### 📋 Registros de: {tienda_filtrada}")
+        st.dataframe(df_mostrar, width="stretch")
