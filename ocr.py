@@ -81,7 +81,6 @@ with pestaña_tiendas:
                 img = Image.open(imagen_subida)
                 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                 
-                # REGLA EXPLICATIVA ADICIONAL: Gestión de cifras centradas / unificadas
                 prompt_ocr = f"""
                 Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
                 
@@ -183,25 +182,29 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
+# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO AL 100%)
 # ------------------------------------------
 with pestaña_dueño:
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido al Propietario")
-        st.write("Por favor, introduce tus credenciales para ver el histórico y las opciones de edición.")
+        st.write("Por favor, introduce tus credenciales para poder ver la tabla de registros y el histórico financiero.")
         
-        input_usuario = st.text_input("Usuario")
-        input_password = st.text_input("Contraseña", type="password")
-        
-        if st.button("🔓 Iniciar Sesión"):
+        c_log1, c_log2 = st.columns(2)
+        with c_log1:
+            input_usuario = st.text_input("Usuario", key="login_user")
+        with c_log2:
+            input_password = st.text_input("Contraseña", type="password", key="login_pass")
+            
+        if st.button("🔓 Entrar al Panel"):
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
                 st.session_state.autenticado = True
-                st.success("¡Acceso concedido!")
+                st.success("¡Autenticación correcta! Cargando datos...")
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
     else:
-        if st.button("🔒 Cerrar Sesión del Propietario"):
+        # BOTÓN PARA CERRAR SESIÓN Y PROTEGER LA PANTALLA INMEDIATAMENTE
+        if st.button("🔒 Cerrar Sesión (Ocultar Todo)"):
             st.session_state.autenticado = False
             st.rerun()
             
@@ -213,6 +216,3 @@ with pestaña_dueño:
         
         if df.empty:
             st.info("Aún no hay datos registrados por las tiendas.")
-        else:
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total Ventas Registradas", f"{df['venta_total'].sum():,.2f} €")
