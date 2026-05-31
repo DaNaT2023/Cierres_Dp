@@ -5,11 +5,11 @@ import datetime
 from PIL import Image
 import openai
 import base64
-import json
+import re
 import io
 
 # ==========================================
-# 1. BASE DE DATOS (SQLite Local / Nube)
+# 1. BASE DE DATOS (SQLite Local)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -31,7 +31,6 @@ def inicializar_bd():
 
 inicializar_bd()
 
-# Lista oficial de tus 6 tiendas reales
 LISTA_TIENDAS = ["Dp Collado", "Dp Valdebebas", "Dp Paracuellos", "Dp Vicálvaro", "Dp Villanueva", "Dp Galapagar"]
 
 def codificar_y_comprimir_imagen(uploaded_file):
@@ -91,14 +90,14 @@ with pestaña_tiendas:
                             api_key=api_key_segura
                         )
                         
+                        # Prompt directo para texto plano, evitando problemas de caracteres JSON
                         prompt_sistema = f"""
                         Analiza esta captura de un recuadro diario de caja de un restaurante.
-                        Busca la columna correspondiente al turno de la '{turno}' y extrae:
-                        1. El nombre del encargado de ese turno específico.
-                        2. El valor numérico de la Venta Total de ese turno.
-                        3. El valor numérico del Quebranto de ese turno (si tiene un signo menos o es negativo, mantén el signo negativo).
-                        Devuelve la respuesta estrictamente en formato JSON plano con esta estructura, sin textos adicionales ni bloques markdown de código:
-                        {{"encargado": "Nombre", "venta": 1200.50, "quebranto": -15.20}}
+                        Busca la columna correspondiente al turno de la '{turno}' y extrae la información.
+                        Devuelve la respuesta estrictamente en estas 3 líneas de texto plano, sin formatos, sin JSON y sin comillas:
+                        encargado: Nombre del encargado aquí
+                        venta: Número con decimales aquí
+                        quebranto: Número con decimales aquí (con signo menos si es negativo)
                         """
                         
                         response = cliente_openrouter.chat.completions.create(
@@ -114,23 +113,37 @@ with pestaña_tiendas:
                             ]
                         )
                         
-                        # --- SISTEMA DE EXTRACCIÓN ANTI-FALLOS ---
-                        # Manejamos de forma segura si OpenRouter responde como texto o como objeto
+                        # Extraer texto de la respuesta de forma segura
                         if isinstance(response, str):
                             texto_respuesta = response
                         else:
-                            texto_respuesta = response.choices[0].message.content
+                            texto_respuesta = response.choices.message.content
                         
-                        # Limpieza de posibles bloques markdown que meta la IA por error
-                        texto_respuesta = texto_respuesta.replace("```json", "").replace("```", "").strip()
+                        # --- EXTRACTOR DE SEGURIDAD MEDIANTE EXPRESIONES REGULARES ---
+                        encargado_auto = "Desconocido"
+                        venta_auto = 0.0
+                        quebranto_auto = 0.0
                         
-                        datos_ia = json.loads(texto_respuesta)
-                        st.session_state['encargado_val'] = datos_ia.get("encargado", "Desconocido")
-                        st.session_state['venta_val'] = float(datos_ia.get("venta", 0.0))
-                        st.session_state['quebranto_val'] = float(datos_ia.get("quebranto", 0.0))
+                        for linea in texto_respuesta.split("\n"):
+                            linea_baja = linea.lower().strip()
+                            if "encargado:" in linea_baja:
+                                encargado_auto = linea.split(":", 1)[1].strip()
+                            elif "venta:" in linea_baja:
+                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
+                                try: venta_auto = float(num_str.replace(",", "."))
+                                except: pass
+                            elif "quebranto:" in linea_baja:
+                                num_str = re.sub(r'[^\d.,-]', '', linea.split(":", 1)[1])
+                                try: quebranto_auto = float(num_str.replace(",", "."))
+                                except: pass
+                        
+                        st.session_state['encargado_val'] = encargado_auto
+                        st.session_state['venta_val'] = venta_auto
+                        st.session_state['quebranto_val'] = quebranto_auto
                         st.success("¡Lectura completada con éxito!")
+                        
                     except Exception as e:
-                        st.error(f"Error en el descifrado de la imagen: {e}")
+                        st.error(f"Error en el procesamiento de la imagen: {e}")
 
         # Recuperar datos extraídos
         val_encargado = st.session_state.get('encargado_val', "")
