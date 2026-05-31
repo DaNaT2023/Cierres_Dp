@@ -2,9 +2,9 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
-import time  # Para controlar las pausas de reintento contra el error 429
-from google import genai  # Librería oficial de Google
-from PIL import Image     # Para manejar la imagen que subas
+import time
+from google import genai
+from PIL import Image
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -18,7 +18,7 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# Inicializar variables en el estado de la sesión para evitar fallos de lectura
+# Inicializar variables de estado de forma totalmente limpia y controlada
 if "tienda_detectada" not in st.session_state:
     st.session_state.tienda_detectada = "Dp Valdebebas"
 if "encargado_detectado" not in st.session_state:
@@ -31,7 +31,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 1. BASE DE DATOS (Se crea sola al arrancar)
+# 1. BASE DE DATOS LOCAL
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -54,7 +54,7 @@ def inicializar_bd():
 inicializar_bd()
 
 # ==========================================
-# 2. INTERFAZ WEB CON STREAMLIT
+# 2. DISEÑO DE LA INTERFAZ WEB
 # ==========================================
 st.set_page_config(page_title="Panel Cierre Diario Dp 🍕", layout="wide")
 
@@ -64,21 +64,26 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS
+# PESTAÑA 1: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("Formulario de Cierre de Turno")
     
-    # ÚNICO botón de selección de turno en toda la aplicación
-    turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True, key="radio_turno_principal")
+    # Control superior para el turno
+    turno_seleccionado = st.radio(
+        "¿Qué turno vas a escanear/subir ahora?", 
+        ["Mañana", "Noche"], 
+        horizontal=True, 
+        key="selector_turno_superior"
+    )
     
     st.subheader("📸 Subir Recuadro Diario")
-    imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"])
+    imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
     
     if imagen_subida is not None:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
-        if st.button("🔍 Leer Recuadro con IA"):
+        if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
             with st.spinner(f"Analizando minuciosamente el turno de la {turno_seleccionado}..."):
                 try:
                     img = Image.open(imagen_subida)
@@ -88,15 +93,15 @@ with pestaña_tiendas:
                     Analiza la imagen de este recuadro de caja de la tienda.
                     Estamos procesando el turno de la: **{turno_seleccionado}**.
                     
-                    REGLAS DE EXTRACCIÓN SEVERAS:
-                    1. ENCARGADO: Extrae única y exclusivamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Desecha el nombre del otro turno.
-                    2. VENTA TOTAL (REGLA CRÍTICA DE CELDA CENTRADA): 
-                       - Busca la cifra de "Venta Total" (importe bruto final acumulado). 
-                       - IGNORA por completo el campo o fila que diga "Venta Neta" o "Base Imponible".
-                       - REGLA DE CENTRADO: Si la casilla o celda de la "Venta Total" se encuentra físicamente centrada o unificada aplicando a todo el día entero (sin divisiones por líneas para mañana y noche), debes usar obligatoriamente ese mismo valor numérico tanto si te pedimos la Mañana como si te pedimos la **{turno_seleccionado}**. No saltes a otras celdas numéricas ni al año (2025/2026).
+                    REGLAS DE EXTRACCIÓN EXTRA ESTRICTAS:
+                    1. ENCARGADO: Extrae única y exclusivamente el nombre de la persona que trabajó en el turno de la **{turno_seleccionado}**. Desecha por completo el nombre del otro turno.
+                    2. VENTA TOTAL: Busca la cifra de "Venta Total" (importe bruto final acumulado). 
+                       - REGLA DE CENTRADO: Si la casilla o celda de la "Venta Total" se encuentra físicamente centrada o unificada aplicando a todo el día entero (sin divisiones por líneas para mañana y noche), debes usar obligatoriamente ese mismo valor numérico tanto si te pedimos la Mañana como si te pedimos la **{turno_seleccionado}**.
+                       - IGNORA por completo el año de la fecha (como 2025 o 2026), no lo asocies con la venta.
+                       - IGNORA el campo o fila que diga "Venta Neta" o "Base Imponible".
                     3. QUEBRANTO: Extrae el número del quebranto asignado a la **{turno_seleccionado}** (si viene con signo menos, mantén el valor negativo).
                     
-                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni marcas de formato Markdown:
+                    Responde ÚNICAMENTE en este formato exacto, sin introducciones ni textos extra:
                     Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
                     Encargado: [Nombre del encargado de la {turno_seleccionado}]
                     Venta: [Número de la venta total sin símbolos]
@@ -141,8 +146,11 @@ with pestaña_tiendas:
                                 st.session_state.encargado_detectado = valor
                             elif clave == "venta":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                if valor_limpio not in ["2025", "2026"] and valor_limpio.replace(".", "", 1).isdigit():
-                                    st.session_state.venta_detectada = float(valor_limpio)
+                                if valor_limpio.replace(".", "", 1).isdigit():
+                                    num_venta = float(valor_limpio)
+                                    # FILTRO INTELIGENTE: Si el número de la venta es menor a 2030, descartamos que sea el año
+                                    if num_venta > 2030:
+                                        st.session_state.venta_detectada = num_venta
                             elif clave == "quebranto":
                                 valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
                                 test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
@@ -165,15 +173,15 @@ with pestaña_tiendas:
     col_izq, col_der = st.columns(2)
     
     with col_izq:
-        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx)
-        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado)
+        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
+        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
         
     with col_der:
-        fecha = st.date_input("Fecha del Recuadro", datetime.date.today())
-        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0, value=st.session_state.venta_detectada)
-        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0, value=st.session_state.quebranto_detectado)
+        fecha = st.date_input("Fecha del Recuadro", datetime.date.today(), key="input_fecha_formulario")
+        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0, value=st.session_state.venta_detectada, key="input_venta_formulario")
+        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0, value=st.session_state.quebranto_detectado, key="input_quebranto_formulario")
 
-    if st.button("🚀 Procesar y Guardar Registro"):
+    if st.button("🚀 Procesar y Guardar Registro", key="btn_guardar_registro_bd"):
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado.")
         else:
@@ -197,11 +205,3 @@ with pestaña_tiendas:
             st.session_state.encargado_detectado = ""
             st.session_state.venta_detectada = 0.0
             st.session_state.quebranto_detectado = 0.0
-            st.rerun()
-
-# ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
-# ------------------------------------------
-with pestaña_dueño:
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido al Propietario")
