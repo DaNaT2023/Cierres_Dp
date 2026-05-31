@@ -1,4 +1,5 @@
 streamlit
 pandas
 pillow
-openai
+requests
+together
