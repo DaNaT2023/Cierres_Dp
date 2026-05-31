@@ -81,12 +81,14 @@ with pestaña_tiendas:
                 img = Image.open(imagen_subida)
                 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                 
-                # MODIFICACIÓN IMPORTANTE: Instrucción reforzada para evitar la venta neta
+                # REGLA EXPLICATIVA ADICIONAL: Gestión de cifras centradas / unificadas
                 prompt_ocr = f"""
                 Analiza la imagen de este recuadro de caja de la tienda y extrae estrictamente los siguientes datos.
                 
-                ATENCIÓN CON LA VENTA: Busca el valor de la VENTA TOTAL (bruta/final con impuestos incluidos). 
-                IGNORA por completo el campo o la casilla de "venta neta" o "base imponible". Queremos el sumatorio total del turno.
+                REGLAS DE NEGOCIO PARA EXTRACCIÓN EXTRAORDINARIA:
+                1. VENTA TOTAL: Busca el valor de la VENTA TOTAL (bruta/final con impuestos incluidos). IGNORA el campo de "venta neta".
+                2. CIFRAS CENTRADAS O UNIFICADAS: Si observas que una cifra (como la venta o el quebranto) aparece centrada, compartida entre columnas, o en una celda única unificada que aplica a todo el día sin separación física por turnos, interpreta que dicho importe aplica por igual para el turno correspondiente que se está enviando. No pases a la celda o fila errónea del día siguiente.
+                3. CIFRAS SEPARADAS: Si el documento separa explícitamente en celdas o filas distintas la "Mañana" de la "Noche", extrae únicamente el valor específico del turno indicado.
                 
                 Responde ÚNICAMENTE en este formato exacto, sin textos adicionales, sin introducciones y sin marcas de formato (no uses bloques de código ```):
                 Tienda: [Debe ser exactamente uno de estos nombres: {', '.join(LISTA_TIENDAS)}]
@@ -214,13 +216,3 @@ with pestaña_dueño:
         else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Total Ventas Registradas", f"{df['venta_total'].sum():,.2f} €")
-            c2.metric("Balance Total Quebrantos", f"{df['quebranto'].sum():,.2f} €")
-            c3.metric("Alertas Críticas Activas", len(df[df['estado_alerta'] != "OK"]))
-            
-            st.markdown("### Tabla Completa de Registros")
-            st.dataframe(df, use_container_width=True)
-            
-            # --- SECCIÓN DE EDICIÓN Y BORRADO DE CASILLAS ---
-            st.markdown("---")
-            st.markdown("### 🛠️ Modificar o Eliminar Registros")
-            
