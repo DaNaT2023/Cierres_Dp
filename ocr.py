@@ -166,6 +166,7 @@ with pestaña_tiendas:
                                     st.session_state.tienda_detectada = t
                             
                             st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
+                            st.session_state.bytes_imagen = None
                             st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
                             st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
                             st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
@@ -201,4 +202,3 @@ with pestaña_tiendas:
     with col1:
         tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
         encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
-        fecha = st.date_input("Fecha del Recuadro", value=st.session_state.fecha_detectada, key="input_fecha_formulario")
