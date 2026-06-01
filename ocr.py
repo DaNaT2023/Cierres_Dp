@@ -149,9 +149,13 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    col_header, col_logout = st.columns(2)
+    # REUBICACIÓN DE CABECERA: Tres columnas arriba para Título, Botón de Guardar y Botón de Salir
+    col_header, col_guardar, col_logout = st.columns([2, 1, 1])
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
+    with col_guardar:
+        # El botón de guardar se sitúa de forma limpia en la barra superior al lado de propietario
+        ejecutar_guardado = st.button("💾 Guardar Cambios", use_container_width=True, type="primary", key="btn_guardar_cambios_propietario")
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
@@ -193,10 +197,4 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
-        
-        # UBICACIÓN FIJA COMPACTA: El botón de guardar se sitúa aquí arriba de la tabla de forma permanente
-        ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_final_v4")
-        
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla y pulsa el botón rojo de ARRIBA al terminar para actualizar el Estado.")
-        
