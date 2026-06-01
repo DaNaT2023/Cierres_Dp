@@ -196,8 +196,6 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
         
-        # Formato de dinero profesional
-        cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
-        config_final = {
-            "ID": st.column_config.NumberColumn(disabled=True),
-            "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
+        # FORMULARIO ULTRA-PLANO Y SEGURO (Sin configuraciones complejas para romper la caché)
+        formulario_dueño = st.form("form_edicion_limpio")
+        tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
