@@ -1,19 +1,39 @@
 import streamlit as st
+import sqlite3
 import pandas as pd
 import datetime
 import time
 import base64
-import requests
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
 # ==========================================
 LISTA_TIENDAS = ["Dp Valdebebas", "Dp Collado", "Dp Paracuellos", "Dp Villanueva", "Dp Galapagar", "Dp Vicálvaro"]
 
-# CONFIGURACIÓN BÁSICA DE PÁGINA
+# ==========================================
+# 1. BASE DE DATOS LOCAL
+# ==========================================
+def inicializar_bd():
+    conexion = sqlite3.connect("tiendas.db")
+    cursor = conexion.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recuadros (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tienda TEXT, turno TEXT, encargado TEXT,
+            venta_neta REAL, venta_total REAL, venta_2025 REAL, venta_entrega REAL, venta_llevar REAL,
+            venta_ventana REAL, venta_come_bebe REAL, venta_visa REAL, venta_efectivo REAL, venta_pluxee REAL,
+            quebranto REAL, ingreso_prosegur REAL, web REAL, tgtg REAL, uber_eats REAL, glovo REAL, just_eat REAL, estado_alerta TEXT
+        )
+    """)
+    conexion.commit()
+    conexion.close()
+
+inicializar_bd()
+
+# ==========================================
+# 2. CONFIGURACIÓN DE PÁGINA Y LOGO CORPORATIVO
+# ==========================================
 st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
 
-# Cargar Logo Corporativo si existe
 def obtener_logo_base64(ruta_imagen):
     try:
         with open(ruta_imagen, "rb") as archivo_img:
@@ -87,27 +107,25 @@ with pestaña_tiendas:
             alerta = "OK"
             if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
-            
-            # CONTROL DE SEGURIDAD CORREGIDO: Extrae la URL de forma segura si existe
-            url_form = st.secrets.get("URL_GOOGLE_FORM", "https://google.com")
-            url_limpia = "".join(url_form.split())
-            
-            payload = {
-                "entry.1000001": fecha.strftime("%Y-%m-%d"), "entry.1000002": tienda, "entry.1000003": turno_seleccionado, "entry.1000004": encargado,
-                "entry.1000005": str(venta_neta), "entry.1000006": str(venta), "entry.1000007": str(venta_2025),
-                "entry.1000008": str(venta_entrega), "entry.1000009": str(venta_llevar), "entry.1000010": str(venta_ventana), "entry.1000011": str(venta_come_bebe),
-                "entry.1000012": str(venta_visa), "entry.1000013": str(venta_efectivo), "entry.1000014": str(venta_pluxee),
-                "entry.1000015": str(quebranto), "entry.1000016": str(ingresado_prosegur), "entry.1000017": str(web), "entry.1000018": str(tgtg),
-                "entry.1000019": str(uber_eats), "entry.1000020": str(glovo), "entry.1000021": str(just_eat), "entry.1000022": alerta
-            }
-            
-            try:
-                respuesta = requests.post(url_limpia, data=payload)
-                st.success("🚀 ¡El cierre se ha enviado y guardado directamente en tu Google Sheets!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al enviar los datos: {e}")
+                
+            conn = sqlite3.connect("tiendas.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO recuadros (
+                    fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
+                    venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, estado_alerta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
+                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                venta_efectivo, venta_pluxee, quebranto, ingresado_prosegur, web, tgtg, uber_eats, glovo, just_eat, alerta
+            ))
+            conn.commit()
+            conn.close()
+            st.success("¡El cierre se ha guardado correctamente!")
+            time.sleep(1)
+            st.rerun()
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -133,21 +151,51 @@ with pestaña_dueño:
 
     col_header, col_logout = st.columns(2)
     with col_header:
-        st.subheader("📊 Enlaces de Control de Dirección")
+        st.subheader("📊 Resumen General de Cierres")
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-            
-    st.markdown("---")
-    st.markdown("### 📋 Gestión y Visualización de Cierres")
-    st.markdown("Para abrir, visualizar y gestionar todo el histórico de cierres diarios de tus 6 tiendas de forma rápida y sin límites, pulsa el siguiente botón:")
     
-    # CONTROL DE SEGURIDAD CORREGIDO: Extrae la URL del excel de forma segura
-    try:
-        url_hoja_cruda = st.secrets["connections"]["gsheets"]["spreadsheet"]
-    except Exception:
-        url_hoja_cruda = "https://google.com"
+    conn = sqlite3.connect("tiendas.db")
+    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    conn.close()
+    
+    if df.empty:
+        st.info("Aún no se han registrado cierres en la base de datos.")
+    else:
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+        with col_f2:
+            alertas_disponibles = list(df['estado_alerta'].unique())
+            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
-    url_hoja_limpia = "".join(url_hoja_cruda.split())
-    st.link_button("📊 Abrir mi Hoja de Cálculo Principal en Google Drive", url=url_hoja_limpia, use_container_width=True, type="primary")
+        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+        
+        columnas_mapeo = {
+            'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
+            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
+            'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
+            'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
+        }
+        
+        mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
+        df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
+        
+        st.markdown("### 📈 Métricas del Grupo")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
+        with col_m2:
+            st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+        with col_m3:
+            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
+        
+        st.markdown("---")
+        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
+        st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
+        
+        # Formulario limpio de edición
+        formulario_dueño = st.form("form_edicion_limpio")
+        tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
