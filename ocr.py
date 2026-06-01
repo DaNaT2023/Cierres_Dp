@@ -181,7 +181,7 @@ with pestaña_tiendas:
                     # Mapear datos a variables de sesión de Streamlit
                     try:
                         st.session_state.fecha_detectada = datetime.datetime.strptime(datos.get("fecha", ""), "%d/%m/%Y").date()
-                    except:
+                    except Exception as e:
                         st.session_state.fecha_detectada = datetime.date.today()
                         
                     if datos.get("tienda") in LISTA_TIENDAS:
