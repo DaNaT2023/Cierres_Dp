@@ -163,7 +163,7 @@ with pestaña_dueño:
                 del st.session_state.df_original
             st.rerun()
 
-    # Mapeo estructurado global de columnas para evitar fallos de variables
+    # Mapeo estructurado de columnas para la interfaz y consultas
     columnas_mapeo = {
         'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
         'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
@@ -205,4 +205,74 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        
+       st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
+            
+            cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
+            configuracion_columnas = {
+                "ID": st.column_config.NumberColumn(disabled=True),
+                "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
+                "Tarjeta": cfg_dinero, "Efectivo": cfg_dinero, "Pluxee": cfg_dinero,
+                "Quebranto": cfg_dinero, "Prosegur": cfg_dinero,
+                "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
+                "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
+            }
+
+            # ---------------------------------------------------------------------------------
+            # LINEA 207 EN ADELANTE: EDICIÓN DE TABLA TOTALMENTE ENLAZADA Y CORREGIDA
+            # ---------------------------------------------------------------------------------
+            edited_df = st.data_editor(
+                df_filtrado, 
+                use_container_width=True, 
+                hide_index=True,
+                num_rows="dynamic",
+                column_config=configuracion_columnas,
+                key="editor_propietario_definitivo"
+            )
+
+            # COMPARACIÓN .EQUALS(): Comprueba desajustes y hace brotar el botón automáticamente ante cambios
+            if not edited_df.equals(df_filtrado):
+                st.warning("⚠️ Hay cambios pendientes por confirmar")
+                
+                if st.button("💾 Guardar cambios", use_container_width=True, type="primary", key="btn_guardar_cambios_modelo_captura"):
+                    conn = sqlite3.connect("tiendas.db")
+                    cursor = conn.cursor()
+                    
+                    # 1. Detectar eliminaciones de filas
+                    ids_actuales = set(edited_df["ID"].tolist())
+                    ids_originales = set(df_filtrado["ID"].tolist())
+                    ids_borrados = ids_originales - ids_actuales
+                    
+                    for id_borrar in ids_borrados:
+                        cursor.execute("DELETE FROM recuadros WHERE id = ?", (id_borrar,))
+                    
+                    # 2. Detectar celdas editadas y guardarlas en SQLite mapeando en minúsculas
+                    for index, fila in edited_df.iterrows():
+                        id_reg = int(fila["ID"])
+                        
+                        v_quebranto = float(fila["Quebranto"])
+                        n_alerta = "OK"
+                        if v_quebranto <= -100: n_alerta = "🚨 CRÍTICO (Pérdida)"
+                        elif v_quebranto >= 100: n_alerta = "⚠️ ATENCIÓN (Exceso)"
+                        
+                        cursor.execute("""
+                            UPDATE recuadros SET 
+                                fecha=?, tienda=?, turno=?, encargado=?, venta_neta=?, venta_total=?, venta_2025=?,
+                                venta_visa=?, venta_efectivo=?, venta_pluxee=?, quebranto=?, ingreso_prosegur=?, estado_alerta=?
+                            WHERE id=?
+                        """, (
+                            str(fila["Fecha"]), str(fila["Tienda"]), str(fila["Turno"]), str(fila["Encargado"]),
+                            float(fila["Venta Neta"]), float(fila["Venta Bruta"]), float(fila["Venta 2025"]),
+                            float(fila["Tarjeta"]), float(fila["Efectivo"]), float(fila["Pluxee"]),
+                            v_quebranto, float(fila["Prosegur"]), n_alerta, id_reg
+                        ))
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    # Limpiamos el cache para recargar la base de datos de forma limpia
+                    if "df_original" in st.session_state:
+                        del st.session_state.df_original
+                    
+                    st.success("Cambios guardados correctamente")
+                    time.sleep(0.8)
+                    st.rerun()
