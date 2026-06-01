@@ -121,7 +121,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Conexión Directa)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Conexión Directa Blindada)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -134,10 +134,11 @@ with pestaña_tiendas:
                     
                     url = "https://together.xyz"
                     
-                    # ENVIAR CABECERAS LIMPIAS AL SERVIDOR DE TOGETHER AI
-                    api_key_limpia = str(st.secrets["TOGETHER_API_KEY"]).strip()
+                    # CLAVE INTEGRADA DIRECTAMENTE AQUÍ PARA EVITAR ERRORES DE CACHÉ Y SALTOS DE LÍNEA
+                    api_key_fija = "tgp_v1_6xomcp2r7wdNWUv32dUu5UGf1_og47bcFUmZcZs_QQU"
+                    
                     headers = {
-                        "Authorization": f"Bearer {api_key_limpia}",
+                        "Authorization": f"Bearer {api_key_fija}",
                         "Content-Type": "application/json"
                     }
                     
@@ -161,7 +162,7 @@ with pestaña_tiendas:
                         resultado_json = response.json()
                         texto_respuesta = resultado_json['choices']['message']['content'].strip()
                     else:
-                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Verifica los secretos de la app.")
+                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Revisa el estado de tus fondos.")
                         error_detectado = True
                         
                 except Exception as api_err:
@@ -207,4 +208,3 @@ with pestaña_tiendas:
                             st.session_state.ingreso_prosegur_detectada = convertir_a_float(datos_json.get("ingreso_prosegur"))
                             st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
                             st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
-                            st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
