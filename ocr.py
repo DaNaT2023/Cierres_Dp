@@ -1,11 +1,9 @@
 import streamlit as st
+import sqlite3
 import pandas as pd
 import datetime
 import time
 import base64
-import io
-import urllib.parse
-import urllib.request
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -19,11 +17,46 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
+# ==========================================
+# 1. BASE DE DATOS LOCAL
+# ==========================================
+def inicializar_bd():
+    conexion = sqlite3.connect("tiendas.db")
+    cursor = conexion.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recuadros (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT,
+            tienda TEXT,
+            turno TEXT,
+            encargado TEXT,
+            venta_neta REAL,
+            venta_total REAL,
+            venta_2025 REAL,
+            venta_entrega REAL,
+            venta_llevar REAL,
+            venta_ventana REAL,
+            venta_come_bebe REAL,
+            venta_visa REAL,
+            venta_efectivo REAL,
+            venta_pluxee REAL,
+            quebranto REAL,
+            ingreso_prosegur REAL,
+            web REAL,
+            tgtg REAL,
+            uber_eats REAL,
+            glovo REAL,
+            just_eat REAL,
+            estado_alerta TEXT
+        )
+    """)
+    conexion.commit()
+    conexion.close()
+
+inicializar_bd()
 
 # ==========================================
-# 1. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
+# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
 try:
     from PIL import Image
@@ -33,6 +66,7 @@ except:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
+# Convertir la imagen local logo.png a Base64 para inyectarla de forma segura en HTML
 def obtener_imagen_base64(ruta_imagen):
     try:
         with open(ruta_imagen, "rb") as archivo_img:
@@ -42,6 +76,7 @@ def obtener_imagen_base64(ruta_imagen):
 
 logo_base64 = obtener_imagen_base64("logo.png")
 
+# CABECERA PERFECTA: Alineada, junta y cargando el logo directamente de forma local
 if logo_base64:
     st.markdown(
         f"""
@@ -60,7 +95,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN 1: FORMULARIO DE ENVÍO DIRECTO A GOOGLE FORMS (MÉTODO GET BLINDADO)
+# SECCIÓN: ENVÍO DE TIENDAS (MANUAL RÁPIDO)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -68,6 +103,7 @@ with pestaña_tiendas:
     turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     st.markdown("---")
     
+    # Formulario compacto de 3 columnas
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -76,12 +112,7 @@ with pestaña_tiendas:
         encargado = st.text_input("Nombre del Encargado", placeholder="Escribe tu nombre", key="input_encargado_formulario")
         fecha = st.date_input("Fecha del Cierre", value=datetime.date.today(), key="input_fecha_formulario")
         
-        st.subheader("📊 Métricas Operativas")
-        total_pedidos = st.number_input("Total Pedidos", min_value=0, value=0, step=1, key="input_tp_formulario")
-        deliverys = st.number_input("Deliverys", min_value=0, value=0, step=1, key="input_del_formulario")
-        produccion_real = st.number_input("Producción Real (€)", min_value=0.0, value=0.0, step=10.0, key="input_pr_formulario")
-        
-        st.subheader("💰 Totales de Caja")
+        st.subheader("💰 Totales Caja")
         venta_neta = st.number_input("Venta Neta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vn_formulario")
         venta = st.number_input("Venta Total / Bruta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vt_formulario")
         venta_2025 = st.number_input("Venta 2025 (€)", min_value=0.0, value=0.0, step=10.0, key="input_v25_formulario")
@@ -91,101 +122,100 @@ with pestaña_tiendas:
         venta_entrega = st.number_input("Venta Entrega (€)", min_value=0.0, value=0.0, step=10.0, key="input_ve_formulario")
         venta_llevar = st.number_input("Venta Llevar (€)", min_value=0.0, value=0.0, step=10.0, key="input_vll_formulario")
         venta_ventana = st.number_input("Venta Ventana (€)", min_value=0.0, value=0.0, step=10.0, key="input_vv_formulario")
-        venta_come_bebe = st.number_input("Venta Come & Bebe (€)", min_value=0.0, value=0.0, step=10.0, key="input_vcb_formulario")
+        venta_come_bebe = st.number_input("Venta Come & Bebe / Sala (€)", min_value=0.0, value=0.0, step=10.0, key="input_vcb_formulario")
         
         st.subheader("💳 Métodos de Pago")
         venta_visa = st.number_input("Venta VISA / Tarjeta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vvi_formulario")
         venta_efectivo = st.number_input("Venta en Efectivo (€)", min_value=0.0, value=0.0, step=10.0, key="input_vef_formulario")
-        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, value=0.0, step=10.0, key="input_vp_formulario")
 
     with col3:
-        st.subheader("⏱️ Tiempos y Alertas")
-        espera_rack = st.text_input("Espera Rack (Ej. 3:45)", value="0:00", key="input_rack_formulario")
-        media_reparto = st.text_input("Media Reparto (Ej. 22:15)", value="0:00", key="input_reparto_formulario")
-        pedidos_mas_45 = st.number_input("Pedidos +45%", min_value=0, value=0, step=1, key="input_p45_formulario")
-        pedidos_mas_10_min = st.number_input("Pedidos > 10 min", min_value=0, value=0, step=1, key="input_p10_formulario")
-        
-        st.subheader("📉 Descuadres y Canales Online")
+        st.subheader("📉 Descuadres")
+        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, value=0.0, step=10.0, key="input_vp_formulario")
         quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", value=0.0, step=5.0, key="input_quebranto_formulario")
         ingreso_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, value=0.0, step=10.0, key="input_pro_formulario")
+        
+        st.subheader("🌐 Agregadores y Online")
         web = st.number_input("Web (€)", min_value=0.0, value=0.0, step=10.0, key="input_web_formulario")
         tgtg = st.number_input("TGTG (€)", min_value=0.0, value=0.0, step=5.0, key="input_tgtg_formulario")
         uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, value=0.0, step=10.0, key="input_uber_formulario")
         glovo = st.number_input("Glovo (€)", min_value=0.0, value=0.0, step=10.0, key="input_glovo_formulario")
         just_eat = st.number_input("Just Eat (€)", min_value=0.0, value=0.0, step=10.0, key="input_je_formulario")
-        
-        st.subheader("🚨 Incidencias")
-        cancelados_motivo = st.text_area("Cancelados - Motivo", placeholder="Escribe aquí los motivos...", key="input_cancelados_formulario")
 
     st.markdown("---")
-    if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_sheets", use_container_width=True):
+    if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
         if encargado.strip() == "":
-            st.error("Por favor, introduce el nombre del encargado.")
+            st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
         else:
-            try:
-                cadena_datos = f"{fecha.strftime('%Y-%m-%d')},{tienda},{turno_seleccionado},{encargado},{total_pedidos},{deliverys},{venta_neta},{venta},{venta_2025},{venta_entrega},{venta_llevar},{venta_ventana},{venta_come_bebe},{venta_visa},{venta_efectivo},{quebranto},{ingreso_prosegur},{produccion_real},{espera_rack},{media_reparto},{pedidos_mas_45},{pedidos_mas_10_min},{web},{tgtg},{uber_eats},{glovo},{just_eat},{cancelados_motivo.replace(',', ' ')}"
+            alerta = "OK"
+            if quebranto <= -100:
+                alerta = "🚨 CRÍTICO (Pérdida)"
+            elif quebranto >= 100:
+                alerta = "⚠️ ATENCIÓN (Exceso)"
                 
-                url_form_base = st.secrets["URL_GOOGLE_FORM"]
-                campo_entry = st.secrets["ENTRY_ID"]
-                
-                parametros_url = urllib.parse.urlencode({campo_entry: cadena_datos})
-                url_get_completa = f"{url_form_base}?{parametros_url}"
-                
-                cabeceras_navegador = {'User-Agent': 'Mozilla/5.0'}
-                peticion_segura = urllib.request.Request(url_get_completa, headers=cabeceras_navegador)
-                
-                with urllib.request.urlopen(peticion_segura) as respuesta:
-                    pass
-                
-                st.success("🚀 ¡Registro transmitido e inyectado correctamente en tu Google Sheets!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al transmitir los datos: {e}")
+            conn = sqlite3.connect("tiendas.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO recuadros (
+                    fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
+                    venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg,
+                    uber_eats, glovo, just_eat, estado_alerta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
+                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg,
+                uber_eats, glovo, just_eat, alerta
+            ))
+            conn.commit()
+            conn.close()
+            
+            st.success(f"¡El cierre de {tienda} ({turno_seleccionado}) se ha guardado correctamente!")
+            time.sleep(1)
+            st.rerun()
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (CÓDIGO 100% PLANO SECUENCIAL ANTIFALLOS)
+# SECCIÓN: PANEL DEL PROPIETARIO
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("🔒 Panel de Control del Administrador")
-    clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
-    
-    if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
-        if clave_ingresada != "":
-            st.error("⚠️ La contraseña introducida no es correcta.")
-        st.warning("Introduce las credenciales arriba para activar el histórico estructurado.")
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido")
+        input_usuario = st.text_input("Usuario", key="login_user_propietario")
+        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
+        
+        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
+            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.success("¡Acceso concedido!")
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
     else:
-        st.success("🔓 Concedido acceso completo al histórico.")
+        if st.button("🔒 Cerrar Sesión", key="btn_cerrar_sesion_propietario"):
+            st.session_state.autenticado = False
+            st.rerun()
+            
         st.markdown("---")
+        st.subheader("📊 Resumen General de Cierres")
         
-        # DEFINICIÓN DIRECTA PLANA SIN TRY INTERMEDIOS QUE ROMPAN LA COMPILACIÓN
-        sheet_id = "1p8Cy9FNukaXNQ6LZnPXLPhpHsifL0oCW7N1WqtBTcbk"
-        url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=1296960697"
+        conn = sqlite3.connect("tiendas.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
         
-        columnas_finales = [
-            "Fecha", "Tienda", "Turno", "Encargado", "Total Pedidos", "Deliverys", 
-            "Venta Neta", "Venta Total", "Venta 2025", "Venta Entrega", "Venta Llevar", 
-            "Venta Ventana", "Venta Come & Bebe", "Venta VISA", "Venta Efectivo", 
-            "Quebranto", "Ingreso Prosegur", "Produccion Real", "Espera Rack", 
-            "Media Reparto", "Pedidos +45%", "Pedidos > 10 min", "Web", "TGTG", 
-            "Uber Eats", "Glovo", "Just Eat", "Cancelados - Motivo"
-        ]
-        
-        # Intentar descargar el CSV de forma directa y limpia
-        try:
-            df_crudo = pd.read_csv(url_csv)
+        if df.empty:
+            st.info("Aún no se han registrado cierres en la base de datos.")
+        else:
+            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+            alertas_disponibles = list(df['estado_alerta'].unique())
+            alertas_filtro = st.multiselect("Filtrar por Estado:", options=alertas_disponibles, default=alertas_disponibles)
             
-            # Si Google Sheets tiene filas con respuestas de texto en la segunda celda
-            listado_filas = []
-            for idx in range(len(df_crudo)):
-                fila_actual = df_crudo.iloc[idx]
-                if len(fila_actual) >= 2:
-                    texto_celda = str(fila_actual.iloc[1])
-                    partes = texto_celda.split(",")
-                    if len(partes) >= 28:
-                        listado_filas.append(partes[:28])
+            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
             
-            df_db = pd.DataFrame(listado_filas, columns=columnas_finales)
-        except:
-            df_db = pd.DataFrame()
+            st.markdown("### 📈 Métricas")
+            st.metric("Venta Bruta Total del Grupo", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            st.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            st.write(f"Turnos totales registrados en el filtro: {len(df_filtrado)}")
             
