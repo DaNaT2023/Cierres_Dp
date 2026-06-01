@@ -193,10 +193,10 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
+        
+        # UBICACIÓN FIJA COMPACTA: El botón de guardar se sitúa aquí arriba de la tabla de forma permanente
+        ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_final_v4")
+        
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla. Al finalizar, pulsa el botón rojo de abajo para confirmar los cambios.")
+        st.caption("💡 Modifica las celdas directamente en la tabla y pulsa el botón rojo de ARRIBA al terminar para actualizar el Estado.")
         
-        # ROMPE-CACHÉ ACTIVADO: Cambiamos la clave a 'editor_v3_fijo' para forzar a Streamlit a pintar la tabla de nuevo
-        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_v3_fijo")
-        
-        st.markdown(" ")
