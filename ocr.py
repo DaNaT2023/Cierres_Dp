@@ -19,10 +19,9 @@ LISTA_TIENDAS = [
 ]
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL RENOMBRADA (SISTEMA DE LIMPIEZA ANTICORRUPCIÓN)
+# 1. BASE DE DATOS LOCAL COMPLETA
 # ==========================================
 def inicializar_bd():
-    # Cambiamos el archivo a pizzerias.db para forzar la creación de una base de datos nueva y limpia
     conexion = sqlite3.connect("pizzerias.db")
     cursor = conexion.cursor()
     cursor.execute("""
@@ -194,7 +193,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (FILTROS ESTABLES)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("📊 Resumen General de Cierres")
@@ -204,6 +203,7 @@ with pestaña_dueño:
     conexion_leer.close()
     
     if df.empty:
-        st.warning("📥 Base de datos vacía y limpia. Envía el primer turno desde la pestaña de envío para activar el histórico.")
+        st.warning("📥 Base de datos vacía. Envía el primer turno desde la pestaña anterior para activar el histórico.")
     else:
-        tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+        # FILTROS ROBUSTOS: Selector único y caja de búsqueda para evitar conflictos visuales
+        opciones_tiendas_filtro = ["Todas las Tiendas"] + LISTA_TIENDAS
