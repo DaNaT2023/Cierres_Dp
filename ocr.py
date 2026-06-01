@@ -18,8 +18,12 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
+# Inicializar de forma segura la variable de autenticación en la sesión
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
 # ==========================================
-# 1. BASE DE DATOS LOCAL COMPLETA
+# 1. BASE DE DATOS LOCAL CON TU NUEVA ESTRUCTURA HORIZONTAL
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("pizzerias.db")
@@ -54,8 +58,7 @@ def inicializar_bd():
             uber_eats REAL,
             glovo REAL,
             just_eat REAL,
-            cancelados_motivo TEXT,
-            estado_alerta TEXT
+            cancelados_motivo TEXT
         )
     """)
     conexion.commit()
@@ -101,7 +104,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO MANUAL)
+# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO MANUAL ENTRADA)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -161,16 +164,10 @@ with pestaña_tiendas:
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
         if encargado.strip() == "":
-            st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
+            st.error("Por favor, introduce el nombre del encargado.")
         else:
-            alerta = "OK"
-            if quebranto <= -100:
-                alerta = "🚨 CRÍTICO (Pérdida)"
-            elif quebranto >= 100:
-                alerta = "⚠️ ATENCIÓN (Exceso)"
-                
-            conexion_guardar = sqlite3.connect("pizzerias.db")
-            cursor = conexion_guardar.cursor()
+            conn = sqlite3.connect("pizzerias.db")
+            cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO recuadros (
                     fecha, tienda, turno, encargado, total_pedidos, deliverys, venta_neta, 
@@ -183,27 +180,29 @@ with pestaña_tiendas:
                 fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, total_pedidos, deliverys, venta_neta,
                 venta, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
                 venta_efectivo, quebranto, ingreso_prosegur, produccion_real, espera_rack, media_reparto,
-                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, alerta
+                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, "OK"
             ))
-            conexion_guardar.commit()
-            conexion_guardar.close()
+            conn.commit()
+            conn.close()
             
-            st.success(f"¡El cierre de {tienda} ({turno_seleccionado}) se ha guardado correctamente!")
+            st.success("¡El cierre de turno se ha guardado correctamente!")
             time.sleep(1)
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (FILTROS ESTABLES)
+# SECCIÓN: PANEL DEL PROPIETARIO (NUEVO CONTROL DE ACCESO LINEAL)
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("📊 Resumen General de Cierres")
-    
-    conexion_leer = sqlite3.connect("pizzerias.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conexion_leer)
-    conexion_leer.close()
-    
-    if df.empty:
-        st.warning("📥 Base de datos vacía. Envía el primer turno desde la pestaña anterior para activar el histórico.")
-    else:
-        # FILTROS ROBUSTOS: Selector único y caja de búsqueda para evitar conflictos visuales
-        opciones_tiendas_filtro = ["Todas las Tiendas"] + LISTA_TIENDAS
+    # Formulario limpio de contraseña plano
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido al Propietario")
+        input_usuario = st.text_input("Usuario Administrador", key="login_user_propietario")
+        input_password = st.text_input("Contraseña Administrador", type="password", key="login_pass_propietario")
+        
+        if st.button("🔓 Desbloquear Histórico", key="btn_autenticar_propietario"):
+            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("Credenciales incorrectas.")
+                
