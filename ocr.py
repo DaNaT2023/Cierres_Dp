@@ -48,7 +48,7 @@ for campo in NUEVOS_CAMPOS:
         else:
             st.session_state[campo] = 0.0
 
-# Función auxiliar para convertir valores a float de forma segura sin romper la indentación
+# Función auxiliar para convertir valores a float de forma segura
 def convertir_a_float(valor):
     if valor is None:
         return 0.0
@@ -176,7 +176,7 @@ with pestaña_tiendas:
                     st.error(f"Error de conexión con la IA: {api_err}")
                     error_detectado = True
 
-                # FLUJO SEGURO 100% LINEAL
+                # FLUJO SEGURO 100% LINEAL SIN CONFUSIÓN DE INDENTACIÓN
                 if not error_detectado and texto_respuesta:
                     if "doctype" in texto_respuesta.lower() or "<html" in texto_respuesta.lower():
                         st.error("El servidor de la IA está saturado. Pulsa el botón de nuevo.")
@@ -185,11 +185,17 @@ with pestaña_tiendas:
                         fin_json = texto_respuesta.rfind("}") + 1
                         
                         if inicio_json != -1 and fin_json != 0:
+                            # 1. Intentar decodificar el JSON de forma aislada
+                            datos_json = None
                             try:
-                                datos = json.loads(texto_respuesta[inicio_json:fin_json])
-                                
-                                # Procesar fecha de forma aislada e independiente
-                                f_str = datos.get("fecha", "")
+                                datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
+                            except:
+                                st.error("Estructura de respuesta ilegible. Reintenta la captura.")
+                            
+                            # 2. Si el JSON es válido, mapear campos en bloque limpio plano
+                            if datos_json is not None:
+                                # Tratar la fecha de forma segura
+                                f_str = datos_json.get("fecha", "")
                                 st.session_state.fecha_detectada = datetime.date.today()
                                 if len(f_str) == 10:
                                     try:
@@ -197,19 +203,15 @@ with pestaña_tiendas:
                                     except:
                                         pass
                                 
-                                if datos.get("tienda") in LISTA_TIENDAS:
-                                    st.session_state.tienda_detectada = datos.get("tienda")
+                                if datos_json.get("tienda") in LISTA_TIENDAS:
+                                    st.session_state.tienda_detectada = datos_json.get("tienda")
                                 
-                                # Mapeo usando la función de conversión segura sin sub-bloques try/except
-                                st.session_state.encargado_detectado = str(datos.get("encargado", ""))
-                                st.session_state.venta_neta_detectada = convertir_a_float(datos.get("venta_neta"))
-                                st.session_state.venta_detectada = convertir_a_float(datos.get("venta_total"))
-                                st.session_state.venta_2025_detectada = convertir_a_float(datos.get("venta_2025"))
-                                st.session_state.venta_entrega_detectada = convertir_a_float(datos.get("venta_entrega"))
-                                st.session_state.venta_llevar_detectada = convertir_a_float(datos.get("venta_llevar"))
-                                st.session_state.venta_ventana_detectada = convertir_a_float(datos.get("venta_ventana"))
-                                st.session_state.venta_come_bebe_detectada = convertir_a_float(datos.get("venta_come_bebe"))
-                                st.session_state.venta_visa_detectada = convertir_a_float(datos.get("venta_visa"))
-                                st.session_state.venta_efectivo_detectada = convertir_a_float(datos.get("venta_efectivo"))
-                                st.session_state.venta_pluxee_detectada = convertir_a_float(datos.get("venta_pluxee"))
-                                st.session_state.quebranto_detectado = convertir_a_float(datos.get("quebranto"))
+                                st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
+                                st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
+                                st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
+                                st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
+                                st.session_state.venta_entrega_detectada = convertir_a_float(datos_json.get("venta_entrega"))
+                                st.session_state.venta_llevar_detectada = convertir_a_float(datos_json.get("venta_llevar"))
+                                st.session_state.venta_ventana_detectada = convertir_a_float(datos_json.get("venta_ventana"))
+                                st.session_state.venta_come_bebe_detectada = convertir_a_float(datos_json.get("venta_come_bebe"))
+                                st.session_state.venta_visa_detectada = convertir_a_float(datos_json.get("venta_visa"))
