@@ -143,7 +143,7 @@ with pestaña_tiendas:
             conn.commit()
             conn.close()
             
-            st.success(f"¡El cierre de {tienda} ({turno_seleccionado}) se ha guardado correctamente en la base de datos!")
+            st.success(f"¡El cierre de {tienda} ({turno_seleccionado}) se ha guardado correctamente!")
             time.sleep(1)
             st.rerun()
 
