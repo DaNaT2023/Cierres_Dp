@@ -149,18 +149,19 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    # REUBICACIÓN DE CABECERA: Tres columnas arriba para Título, Botón de Guardar y Botón de Salir
+    # 1. Cabecera alineada arriba con tres columnas fijas
     col_header, col_guardar, col_logout = st.columns([2, 1, 1])
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
     with col_guardar:
-        # El botón de guardar se sitúa de forma limpia en la barra superior al lado de propietario
-        ejecutar_guardado = st.button("💾 Guardar Cambios", use_container_width=True, type="primary", key="btn_guardar_cambios_propietario")
+        # El botón de guardar se sitúa arriba y captura la acción de forma directa
+        ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cabecera_final")
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
     
+    # 2. Lectura y preparación de los datos recogidos en la base de datos
     conn = sqlite3.connect("tiendas.db")
     df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
     conn.close()
