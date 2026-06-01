@@ -4,7 +4,6 @@ import pandas as pd
 import datetime
 import time
 import base64
-import io
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -190,20 +189,25 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA 100% LINEAL BARRICADA ANTIFALLOS)
+# SECCIÓN: PANEL DEL PROPIETARIO (MUESTRA DE CONTROL DE 3 COLUMNAS)
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("🔒 Panel de Control del Administrador")
-    clave_ingresada = st.text_input("Introduce la contraseña de acceso para el propietario:", type="password", key="pass_propietario_plana")
+    st.subheader("🔒 Acceso de Administración Simplificado")
+    clave_ingresada = st.text_input("Introduce tu contraseña:", type="password", key="pass_propietario_plana")
     
-    # Detención inmediata lineal para evitar condicionales tabulados peligrosos
+    # Detención lineal plana (Evita fallos de indentación)
     if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
         if clave_ingresada != "":
-            st.error("⚠️ La contraseña introducida no es correcta.")
-        st.warning("Introduce las credenciales arriba para ver el histórico de cierres.")
+            st.error("⚠️ Contraseña incorrecta.")
+        st.info("Escribe la contraseña arriba para activar la tabla de prueba.")
         st.stop()
 
-    st.success("🔓 Acceso concedido correctamente.")
+    st.success("🔓 Conectado con éxito.")
     st.markdown("---")
     
+    # Leer la tabla real de la base de datos
     conn = sqlite3.connect("pizzerias_final.db")
+    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    conn.close()
+    
+    if df.empty:
