@@ -3,8 +3,8 @@ import pandas as pd
 import datetime
 import time
 import base64
-import io
-from streamlit_gsheets import GSheetsConnection
+import urllib.parse
+import urllib.request
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -58,14 +58,8 @@ st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
-# ESTABLECER CONEXIÓN REAL CON EL EXCEL ONLINE DE GOOGLE SECRETS
-try:
-    conn_sheets = st.connection("gsheets", type=GSheetsConnection)
-except:
-    conn_sheets = None
-
 # ------------------------------------------
-# SECCIÓN 1: FORMULARIO DE ENVÍO DIRECTO A GOOGLE SHEETS
+# SECCIÓN 1: FORMULARIO DE ENVÍO INVISIBLE A TRAVÉS DE GOOGLE FORMS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -126,38 +120,29 @@ with pestaña_tiendas:
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_sheets", use_container_width=True):
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado.")
-        elif conn_sheets is None:
-            st.error("Error: Conector de Google Sheets no configurado correctamente.")
         else:
             try:
-                # 📦 Crear la fila con las 28 palabras exactas de tu lista para inyectar
-                fila_nueva = pd.DataFrame([{
-                    "Fecha": fecha.strftime("%Y-%m-%d"), "Tienda": tienda, "Turno": turno_seleccionado, "Encargado": encargado,
-                    "Total Pedidos": total_pedidos, "Deliverys": deliverys, "Venta Neta": venta_neta, "Venta Total": venta,
-                    "Venta 2025": venta_2025, "Venta Entrega": venta_entrega, "Venta Llevar": venta_llevar, "Venta Ventana": venta_ventana,
-                    "Venta Come & Bebe": venta_come_bebe, "Venta VISA": venta_visa, "Venta Efectivo": venta_efectivo, "Quebranto": quebranto,
-                    "Ingreso Prosegur": ingreso_prosegur, "Produccion Real": produccion_real, "Espera Rack": espera_rack, "Media Reparto": media_reparto,
-                    "Pedidos +45%": pedidos_mas_45, "Pedidos > 10 min": pedidos_mas_10_min, "Web": web, "TGTG": tgtg, "Uber Eats": uber_eats,
-                    "Glovo": glovo, "Just Eat": just_eat, "Cancelados - Motivo": cancelados_motivo
-                }])
+                # Empaquetamos los 28 datos en una sola línea de texto separada por comas
+                cadena_datos = f"{fecha.strftime('%Y-%m-%d')},{tienda},{turno_seleccionado},{encargado},{total_pedidos},{deliverys},{venta_neta},{venta},{venta_2025},{venta_entrega},{venta_llevar},{venta_ventana},{venta_come_bebe},{venta_visa},{venta_efectivo},{quebranto},{ingreso_prosegur},{produccion_real},{espera_rack},{media_reparto},{pedidos_mas_45},{pedidos_mas_10_min},{web},{tgtg},{uber_eats},{glovo},{just_eat},{cancelados_motivo.replace(',', ' ')}"
                 
-                # Leer tu Google Sheets desde el enlace secreto de Secrets
-                df_existente = conn_sheets.read(spreadsheet=st.secrets["URL_GOOGLE_SHEETS"])
+                # Envío directo simulando HTTP POST de Google Forms nativo
+                url_form = st.secrets["URL_GOOGLE_FORM"]
+                campo_entry = st.secrets["ENTRY_ID"]
                 
-                # Unir la fila nueva abajo de todo de forma horizontal limpia
-                df_final = pd.concat([df_existente, fila_nueva], ignore_index=True)
+                valores_post = {campo_entry: cadena_datos}
+                datos_codificados = urllib.parse.urlencode(valores_post).encode('utf-8')
                 
-                # Reescribir tu hoja online con la nueva línea añadida
-                conn_sheets.update(spreadsheet=st.secrets["URL_GOOGLE_SHEETS"], data=df_final)
+                peticion = urllib.request.Request(url_form, data=datos_codificados)
+                urllib.request.urlopen(peticion)
                 
-                st.success("🚀 ¡Registro inyectado y guardado de forma permanente en tu Google Sheets!")
+                st.success("🚀 ¡Registro guardado y transmitido con éxito a tu nube de Google!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al transmitir los datos al Excel online: {e}")
+                st.error(f"Error al transmitir los datos: {e}")
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (PESTAÑAS LEÍDAS DE TU EXCEL ONLINE)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA DIRECTA DESDE LA PESTAÑA DE RESPUESTAS CORREGIDA)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
@@ -172,17 +157,33 @@ with pestaña_dueño:
         st.markdown("---")
         
         try:
-            df_db = conn_sheets.read(spreadsheet=st.secrets["URL_GOOGLE_SHEETS"])
-        except:
+            # Extraer de forma limpia el ID único de la URL
+            url_base = st.secrets["URL_GOOGLE_SHEETS"]
+            sheet_id = url_base.split("/d/")[1].split("/")[0]
+            
+            # CORRECCIÓN EN LA ID DE LECTURA (gid=129696097 apunta directamente a tu hoja morada)
+            url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=129696097"
+            df_crudo = pd.read_csv(url_csv)
+            
+            columnas_finales = [
+                "Fecha", "Tienda", "Turno", "Encargado", "Total Pedidos", "Deliverys", 
+                "Venta Neta", "Venta Total", "Venta 2025", "Venta Entrega", "Venta Llevar", 
+                "Venta Ventana", "Venta Come & Bebe", "Venta VISA", "Venta Efectivo", 
+                "Quebranto", "Ingreso Prosegur", "Produccion Real", "Espera Rack", 
+                "Media Reparto", "Pedidos +45%", "Pedidos > 10 min", "Web", "TGTG", 
+                "Uber Eats", "Glovo", "Just Eat", "Cancelados - Motivo"
+            ]
+            
+            listado_filas = []
+            for _, fila in df_crudo.iterrows():
+                # Google Forms guarda las respuestas en la columna 2 (columna 'Datos')
+                if len(fila) >= 2:
+                    texto_celda = str(fila.iloc[1])
+                    partes = texto_celda.split(",")
+                    if len(partes) >= 28:
+                        listado_filas.append(partes[:28])
+            
+            df_db = pd.DataFrame(listado_filas, columns=columnas_finales)
+        except Exception as err:
             df_db = pd.DataFrame()
         
-        if df_db.empty or df_db.shape < 1:
-            st.info("ℹ— Tu Google Sheets online está conectado. En cuanto guardes el primer turno con el nuevo botón, aparecerá aquí de forma automática.")
-        else:
-            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-            if not tiendas_filtro:
-                tiendas_filtro = LISTA_TIENDAS
-                
-            df_filtrado = df_db[df_db['Tienda'].isin(tiendas_filtro)].copy()
-            
-            st.markdown("### 📈 Métricas Generales")
