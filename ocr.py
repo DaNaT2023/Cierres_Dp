@@ -125,7 +125,7 @@ with pestaña_tiendas:
             conn.close()
             st.success("¡El cierre se ha guardado correctamente!")
             
-            # Forzamos que el Panel de Control refresque sus datos al recibir un nuevo turno
+            # Borrar la caché para que el panel lea el nuevo dato de inmediato
             if "df_original" in st.session_state:
                 del st.session_state.df_original
                 
@@ -164,7 +164,7 @@ with pestaña_dueño:
                 del st.session_state.df_original
             st.rerun()
 
-    # IMPLEMENTACIÓN FIJA SEGÚN TU CAPTURA: Guardar el DataFrame original en session_state para comparar
+    # 1. LEER DE VERDAD LOS DATOS DE LOS ENCARGADOS Y CARGARLOS EN MEMORIA
     if "df_original" not in st.session_state:
         conn = sqlite3.connect("tiendas.db")
         df_base = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
@@ -196,10 +196,11 @@ with pestaña_dueño:
         
         df_filtrado = df_vista[df_vista['Tienda'].isin(tiendas_filtro) & df_vista['Estado'].isin(alertas_filtro)].copy()
         
-        # Métricas Dinámicas superiores
+        # Métricas principales
         st.markdown("### 📈 Métricas del Grupo")
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
         with col_m2:
             st.metric("Balance de Quebrantos", f"{df_filtrado['Quebranto'].sum():,.2f} €")
+        with col_m3:
