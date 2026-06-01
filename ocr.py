@@ -109,7 +109,7 @@ with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
-    # SISTEMA DE SEGURIDAD LINEAL (Control por interrupción)
+    # SISTEMA DE SEGURIDAD LINEAL
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -123,10 +123,10 @@ with pestaña_dueño:
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
-        st.stop() # Frena la ejecución aquí si no está logueado. Evita errores de llaves abajo.
+        st.stop()
 
-    # CÓDIGO DEL PANEL (Solo se ejecuta si pasó el login de arriba)
-    col_header, col_logout = st.columns()
+    # CORRECCIÓN AQUÍ: Definimos explícitamente las 2 columnas pasándole un entero (2)
+    col_header, col_logout = st.columns(2)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
     with col_logout:
@@ -173,7 +173,6 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
         
-        # Tabla interactiva plana (Sintaxis 100% limpia)
         tabla_editada = st.data_editor(
             df_vista, 
             use_container_width=True, 
@@ -195,3 +194,7 @@ with pestaña_dueño:
                     cursor.execute("DELETE FROM recuadros WHERE id = ?", (id_a_borrar,))
             
             filas_modificadas = estado_editor.get("edited_rows", {})
+            for idx_str, cambios in filas_modificadas.items():
+                idx = int(idx_str)
+                id_registro = int(df_vista.iloc[idx]["ID"])
+                
