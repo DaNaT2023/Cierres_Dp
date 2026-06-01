@@ -196,6 +196,7 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
         
-        # TABLA EN UNA SOLA LÍNEA LIMPIA (Cero riesgo de SyntaxError)
         tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
         
+        if st.button("💾 Guardar Cambios en la Base de Datos", type="primary", use_container_width=True):
+            conn = sqlite3.connect("tiendas.db")
