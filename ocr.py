@@ -18,10 +18,6 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# Inicializar de forma segura la variable de autenticación en la sesión
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-
 # ==========================================
 # 1. BASE DE DATOS LOCAL COMPLETA
 # ==========================================
@@ -197,13 +193,22 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (LÓGICA MEJORADA DE ACCESO)
+# SECCIÓN: PANEL DEL PROPIETARIO (CÓDIGO PLANO SIN BLOQUES DE VERIFICACIÓN)
 # ------------------------------------------
 with pestaña_dueño:
-    # Si NO está autenticado, muestra estrictamente el formulario de contraseña
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido")
-        input_usuario = st.text_input("Usuario", key="login_user_propietario")
-        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
+    st.subheader("📊 Resumen General de Cierres")
+    
+    conn = sqlite3.connect("tiendas.db")
+    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    conn.close()
+    
+    if df.empty:
+        st.info("Aún no se han registrado cierres en la base de datos.")
+    else:
+        # Filtro automático: por defecto selecciona todas las tiendas
+        tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+        if not tiendas_filtro:
+            tiendas_filtro = LISTA_TIENDAS
+            
+        df_filtrado = df[df['tienda'].isin(tiendas_filtro)].copy()
         
-        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
