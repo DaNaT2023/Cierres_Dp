@@ -4,8 +4,7 @@ import datetime
 import time
 import base64
 import io
-import urllib.parse
-import urllib.request
+from streamlit_gsheets import GSheetsConnection
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -59,8 +58,14 @@ st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
+# ESTABLECER CONEXIÓN REAL CON EL EXCEL ONLINE DE GOOGLE SECRETS
+try:
+    conn_sheets = st.connection("gsheets", type=GSheetsConnection)
+except:
+    conn_sheets = None
+
 # ------------------------------------------
-# SECCIÓN 1: FORMULARIO DE ENVÍO DIRECTO A GOOGLE SHEETS (REPARADO)
+# SECCIÓN 1: FORMULARIO DE ENVÍO DIRECTO A GOOGLE SHEETS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -118,27 +123,41 @@ with pestaña_tiendas:
         cancelados_motivo = st.text_area("Cancelados - Motivo", placeholder="Escribe aquí los motivos...", key="input_cancelados_formulario")
 
     st.markdown("---")
-    if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
+    if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_sheets", use_container_width=True):
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado.")
+        elif conn_sheets is None:
+            st.error("Error: Conector de Google Sheets no configurado correctamente.")
         else:
             try:
-                # Extraer de forma robusta la ID de tu hoja desde la URL de los Secrets
-                url_base = st.secrets["URL_GOOGLE_SHEETS"]
-                sheet_id = url_base.split("/d/")[1].split("/")[0]
+                # 📦 Crear la fila con las 28 palabras exactas de tu lista para inyectar
+                fila_nueva = pd.DataFrame([{
+                    "Fecha": fecha.strftime("%Y-%m-%d"), "Tienda": tienda, "Turno": turno_seleccionado, "Encargado": encargado,
+                    "Total Pedidos": total_pedidos, "Deliverys": deliverys, "Venta Neta": venta_neta, "Venta Total": venta,
+                    "Venta 2025": venta_2025, "Venta Entrega": venta_entrega, "Venta Llevar": venta_llevar, "Venta Ventana": venta_ventana,
+                    "Venta Come & Bebe": venta_come_bebe, "Venta VISA": venta_visa, "Venta Efectivo": venta_efectivo, "Quebranto": quebranto,
+                    "Ingreso Prosegur": ingreso_prosegur, "Produccion Real": produccion_real, "Espera Rack": espera_rack, "Media Reparto": media_reparto,
+                    "Pedidos +45%": pedidos_mas_45, "Pedidos > 10 min": pedidos_mas_10_min, "Web": web, "TGTG": tgtg, "Uber Eats": uber_eats,
+                    "Glovo": glovo, "Just Eat": just_eat, "Cancelados - Motivo": cancelados_motivo
+                }])
                 
-                # REPARACIÓN: Conexión mediante volcado forzado HTTP de Google Sheets API
-                url_limpia = f"https://google.com{sheet_id}/gviz/tq"
+                # Leer tu Google Sheets desde el enlace secreto de Secrets
+                df_existente = conn_sheets.read(spreadsheet=st.secrets["URL_GOOGLE_SHEETS"])
                 
-                # Simulador de persistencia para que el flujo de Streamlit procese la transacción
-                st.success("🚀 ¡Registro guardado de forma permanente en tu Google Sheets corporativo!")
-                time.sleep(0.5)
+                # Unir la fila nueva abajo de todo de forma horizontal limpia
+                df_final = pd.concat([df_existente, fila_nueva], ignore_index=True)
+                
+                # Reescribir tu hoja online con la nueva línea añadida
+                conn_sheets.update(spreadsheet=st.secrets["URL_GOOGLE_SHEETS"], data=df_final)
+                
+                st.success("🚀 ¡Registro inyectado y guardado de forma permanente en tu Google Sheets!")
+                time.sleep(1)
                 st.rerun()
-            except Exception as sheet_err:
-                st.error(f"Error de conexión cloud: {sheet_err}")
+            except Exception as e:
+                st.error(f"Error al transmitir los datos al Excel online: {e}")
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA DIRECTA DESDE TU HOJA)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (PESTAÑAS LEÍDAS DE TU EXCEL ONLINE)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
@@ -153,16 +172,12 @@ with pestaña_dueño:
         st.markdown("---")
         
         try:
-            url_base = st.secrets["URL_GOOGLE_SHEETS"]
-            sheet_id = url_base.split("/d/")[1].split("/")[0]
-            # Convertir URL de edición a enlace de descarga directa en CSV limpia sin fallos
-            url_csv = f"https://google.com{sheet_id}/export?format=csv"
-            df_db = pd.read_csv(url_csv)
-        except Exception as read_err:
+            df_db = conn_sheets.read(spreadsheet=st.secrets["URL_GOOGLE_SHEETS"])
+        except:
             df_db = pd.DataFrame()
         
-        if df_db.empty or df_db.shape[0] < 1:
-            st.info("ℹ️ Tu Google Sheets online está conectado. En cuanto un encargado envíe el primer turno aparecerá aquí de forma automática.")
+        if df_db.empty or df_db.shape < 1:
+            st.info("ℹ— Tu Google Sheets online está conectado. En cuanto guardes el primer turno con el nuevo botón, aparecerá aquí de forma automática.")
         else:
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
             if not tiendas_filtro:
@@ -170,22 +185,4 @@ with pestaña_dueño:
                 
             df_filtrado = df_db[df_db['Tienda'].isin(tiendas_filtro)].copy()
             
-            st.markdown("### 📈 Métricas Generales del Grupo")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Venta Bruta Total del Grupo", f"{pd.to_numeric(df_filtrado['Venta Total'], errors='coerce').sum():,.2f} €")
-            m2.metric("Balance Total de Quebrantos", f"{pd.to_numeric(df_filtrado['Quebranto'], errors='coerce').sum():,.2f} €")
-            m3.metric("Turnos Registrados", len(df_filtrado))
-            
-            st.markdown("---")
-            st.subheader("📋 Cuadrante Operativo Dividido por Categorías")
-            
-            sub_p1, sub_p2, sub_p3, sub_p4 = st.tabs([
-                "💰 1. Resumen de Caja y Totales", 
-                "🍕 2. Desglose de Canales Tienda", 
-                "⏱️ 3. Tiempos y Alertas de Servicio", 
-                "🌐 4. Canales Online e Inidencias"
-            ])
-            
-            with sub_p1:
-                st.markdown("##### Control General de Caja, Efectivo y Tarjetas")
-                columnas_p1 = [c for c in ["Fecha", "Tienda", "Turno", "Encargado", "Venta Neta", "Venta Total", "Venta 2025", "Venta VISA", "Venta Efectivo", "Quebranto", "Ingreso Prosegur"] if c in df_filtrado.columns]
+            st.markdown("### 📈 Métricas Generales")
