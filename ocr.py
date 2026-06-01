@@ -67,7 +67,7 @@ def inicializar_bd():
 inicializar_bd()
 
 # ==========================================
-# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
+# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO (ERROR 12 SOLUCIONADO)
 # ==========================================
 try:
     from PIL import Image
@@ -189,25 +189,22 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (MUESTRA DE CONTROL DE 3 COLUMNAS)
+# SECCIÓN: PANEL DEL PROPIETARIO (MUESTRA PLANA DE 3 COLUMNAS)
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("🔒 Acceso de Administración Simplificado")
-    clave_ingresada = st.text_input("Introduce tu contraseña:", type="password", key="pass_propietario_plana")
+    st.subheader("🔒 Panel de Control del Administrador")
+    clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
     
-    # Detención lineal plana (Evita fallos de indentación)
+    # Detención de seguridad lineal estricta
     if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
-        if clave_ingresada != "":
-            st.error("⚠️ Contraseña incorrecta.")
-        st.info("Escribe la contraseña arriba para activar la tabla de prueba.")
+        st.info("Escribe las credenciales arriba para activar la tabla de control.")
         st.stop()
 
-    st.success("🔓 Conectado con éxito.")
+    st.success("🔓 Conectado de forma correcta.")
     st.markdown("---")
     
-    # Leer la tabla real de la base de datos
+    # Carga lineal directa sin condiciones de filtrado
     conn = sqlite3.connect("pizzerias_final.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    df_db = pd.read_sql_query("SELECT fecha, tienda, encargado FROM recuadros ORDER BY fecha DESC, id DESC", conn)
     conn.close()
     
-    if df.empty:
