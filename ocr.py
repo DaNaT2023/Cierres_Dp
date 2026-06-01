@@ -125,7 +125,6 @@ with pestaña_tiendas:
             conn.close()
             st.success("¡El cierre se ha guardado correctamente!")
             
-            # Borrar la caché para que el panel lea el nuevo dato de inmediato
             if "df_original" in st.session_state:
                 del st.session_state.df_original
                 
@@ -164,18 +163,18 @@ with pestaña_dueño:
                 del st.session_state.df_original
             st.rerun()
 
-    # 1. LEER DE VERDAD LOS DATOS DE LOS ENCARGADOS Y CARGARLOS EN MEMORIA
+    # Mapeo estructurado global de columnas para evitar fallos de variables
+    columnas_mapeo = {
+        'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
+        'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
+        'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
+        'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
+    }
+
     if "df_original" not in st.session_state:
         conn = sqlite3.connect("tiendas.db")
         df_base = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
         conn.close()
-        
-        columnas_mapeo = {
-            'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
-            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
-            'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-            'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
-        }
         
         if not df_base.empty:
             df_base = df_base[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
@@ -186,7 +185,6 @@ with pestaña_dueño:
     if df_vista.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
     else:
-        # Filtros visuales superiores
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
@@ -196,7 +194,6 @@ with pestaña_dueño:
         
         df_filtrado = df_vista[df_vista['Tienda'].isin(tiendas_filtro) & df_vista['Estado'].isin(alertas_filtro)].copy()
         
-        # Métricas principales
         st.markdown("### 📈 Métricas del Grupo")
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
@@ -204,3 +201,8 @@ with pestaña_dueño:
         with col_m2:
             st.metric("Balance de Quebrantos", f"{df_filtrado['Quebranto'].sum():,.2f} €")
         with col_m3:
+            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
+        
+        st.markdown("---")
+        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
+        
