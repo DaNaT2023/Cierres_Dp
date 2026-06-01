@@ -1,5 +1,4 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import datetime
 import time
@@ -11,23 +10,10 @@ import base64
 LISTA_TIENDAS = ["Dp Valdebebas", "Dp Collado", "Dp Paracuellos", "Dp Villanueva", "Dp Galapagar", "Dp Vicálvaro"]
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL
+# 1. INICIALIZAR ALMACENAMIENTO EN SESIÓN (TOMANDO NOTA DE TU EJEMPLO)
 # ==========================================
-def inicializar_bd():
-    conexion = sqlite3.connect("tiendas.db")
-    cursor = conexion.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recuadros (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tienda TEXT, turno TEXT, encargado TEXT,
-            venta_neta REAL, venta_total REAL, venta_2025 REAL, venta_entrega REAL, venta_llevar REAL,
-            venta_ventana REAL, venta_come_bebe REAL, venta_visa REAL, venta_efectivo REAL, venta_pluxee REAL,
-            quebranto REAL, ingreso_prosegur REAL, web REAL, tgtg REAL, uber_eats REAL, glovo REAL, just_eat REAL, estado_alerta TEXT
-        )
-    """)
-    conexion.commit()
-    conexion.close()
-
-inicializar_bd()
+if "cierres_memoria" not in st.session_state:
+    st.session_state.cierres_memoria = []
 
 # ==========================================
 # 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
@@ -61,7 +47,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS
+# SECCIÓN: ENVÍO DE TIENDAS (GUARDA EN SESSION_STATE)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -107,28 +93,30 @@ with pestaña_tiendas:
             alerta = "OK"
             if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
-                
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO recuadros (
-                    fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
-                    venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, estado_alerta
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
-                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                venta_efectivo, venta_pluxee, quebranto, ingresado_prosegur, web, tgtg, uber_eats, glovo, just_eat, alerta
-            ))
-            conn.commit()
-            conn.close()
-            st.success("¡El cierre se ha guardado correctamente!")
+            
+            # GUARDADO DIRECTO EN LA MEMORIA DE LA SESIÓN (SESSION_STATE)
+            st.session_state.cierres_memoria.append({
+                "Fecha": fecha.strftime("%Y-%m-%d"),
+                "Tienda": tienda,
+                "Turno": turno_seleccionado,
+                "Encargado": encargado,
+                "Venta Neta": venta_neta,
+                "Venta Bruta": venta,
+                "Venta 2025": venta_2025,
+                "Tarjeta": venta_visa,
+                "Efectivo": venta_efectivo,
+                "Pluxee": venta_pluxee,
+                "Quebranto": quebranto,
+                "Prosegur": ingresado_prosegur,
+                "Estado": alerta
+            })
+            
+            st.success("¡El cierre del turno se ha guardado temporalmente en la memoria de la web!")
             time.sleep(1)
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (MUESTRA CON ST.DATAFRAME)
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
@@ -147,53 +135,61 @@ with pestaña_dueño:
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
-                
-    else:
-        col_header, col_guardar, col_logout = st.columns(3)
-        with col_header:
-            st.subheader("📊 Resumen General de Cierres")
-        with col_guardar:
-            ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cabecera_final")
-        with col_logout:
-            if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
-                st.session_state.autenticado = False
-                st.rerun()
-        
-        conn = sqlite3.connect("tiendas.db")
-        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-        conn.close()
-        
-        if df.empty:
-            st.info("Aún no se han registrado cierres en la base de datos.")
-        else:
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-            with col_f2:
-                alertas_disponibles = list(df['estado_alerta'].unique())
-                alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
+        st.stop()
+
+    # Cabecera superior limpia del propietario
+    col_header, col_logout = st.columns(2)
+    with col_header:
+        st.subheader("📊 Resumen General de Cierres")
+    with col_logout:
+        if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
+            st.session_state.autenticado = False
+            st.rerun()
             
-            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
-            
-            columnas_mapeo = {
-                'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
-                'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
-                'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-                'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
+    st.markdown("---")
+
+    # CARGA REÁCTIVA DESDE TU EJEMPLO DE CAPTURA
+    if st.session_state.cierres_memoria:
+        # Convertimos la lista acumulada de la sesión en un DataFrame limpio
+        df_completo = pd.DataFrame(st.session_state.cierres_memoria)
+        
+        # Filtros interactivos superiores basados en el DataFrame cargado
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+        with col_f2:
+            alertas_disponibles = list(df_completo['Estado'].unique())
+            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
+        
+        # Filtrado reactivo en pantalla
+        df_filtrado = df_completo[df_completo['Tienda'].isin(tiendas_filtro) & df_completo['Estado'].isin(alertas_filtro)].copy()
+        
+        # Mostrar Métricas del grupo actualizadas en vivo
+        st.markdown("### 📈 Métricas del Grupo")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
+        with col_m2:
+            st.metric("Balance de Quebrantos", f"{df_filtrado['Quebranto'].sum():,.2f} €")
+        with col_m3:
+            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
+        
+        st.markdown("---")
+        st.subheader("📋 Tabla Histórica de Cierres (Detalle)")
+        
+        # FORMATO DE DINERO PROFESIONAL PARA TU ST.DATAFRAME()
+        cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
+        
+        # Despliegue de st.dataframe() plano sin errores de guardado según tu ejemplo
+        st.dataframe(
+            df_filtrado,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
+                "Tarjeta": cfg_dinero, "Efectivo": cfg_dinero, "Pluxee": cfg_dinero,
+                "Quebranto": cfg_dinero, "Prosegur": cfg_dinero
             }
-            
-            mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
-            df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
-            
-            st.markdown("### 📈 Métricas del Grupo")
-            col_m1, col_m2, col_m3 = st.columns(3)
-            
-            # CORRECCIÓN DE ESPACIOS: Las métricas cargan ahora de forma directa y plana en cada columna sin fallar
-            with col_m1:
-                st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
-            with col_m2:
-                st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
-            with col_m3:
-                st.metric("Turnos Registrados", f"{len(df_filtrado)}")
-            
-            st.markdown("---")
+        )
+    else:
+        st.info("No hay datos registrados en esta sesión todavía.")
