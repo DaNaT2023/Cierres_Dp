@@ -185,8 +185,8 @@ with pestaña_dueño:
             "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
         }
         
+        # Formulario limpio de edición
         formulario_dueño = st.form("form_edicion_limpio")
         tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", column_config=config_final, key="editor_propietario")
         ejecutar_guardado = formulario_dueño.form_submit_button("💾 Guardar Cambios en Google Sheets", use_container_width=True, type="primary")
             
-        if ejecutar_guardado:
