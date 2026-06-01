@@ -190,12 +190,13 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (CÓDIGO 100% PLANO SIN MAPAS DE INDENTACIÓN)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA 100% LINEAL BARRICADA ANTIFALLOS)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
     clave_ingresada = st.text_input("Introduce la contraseña de acceso para el propietario:", type="password", key="pass_propietario_plana")
     
+    # Detención inmediata lineal para evitar condicionales tabulados peligrosos
     if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
         if clave_ingresada != "":
             st.error("⚠️ La contraseña introducida no es correcta.")
@@ -206,7 +207,3 @@ with pestaña_dueño:
     st.markdown("---")
     
     conn = sqlite3.connect("pizzerias_final.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
-    
-    if df.empty:
