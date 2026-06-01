@@ -221,5 +221,4 @@ with pestaña_dueño:
             st.markdown("---")
             st.subheader("📋 Histórico de Turnos")
             
-            # PARÉNTESIS CERRADO CORRECTAMENTE EN ESTA SECCIÓN DEFINITIVA
-            st.dataframe(
+            # LLAMADA ULTRA SEGURA Y PLANA SIN CONFIGURACIONES DE PARÉNTESIS COMPLEJOS
