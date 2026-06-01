@@ -48,6 +48,15 @@ for campo in NUEVOS_CAMPOS:
         else:
             st.session_state[campo] = 0.0
 
+# Función auxiliar para convertir valores a float de forma segura sin romper la indentación
+def convertir_a_float(valor):
+    if valor is None:
+        return 0.0
+    try:
+        return float(valor)
+    except:
+        return 0.0
+
 # ==========================================
 # 1. BASE DE DATOS LOCAL
 # ==========================================
@@ -117,7 +126,6 @@ with pestaña_tiendas:
                 texto_respuesta = ""
                 error_detectado = False
                 
-                # BLOQUE TRY EXCLUSIVO PARA LA LLAMADA DE LA API
                 try:
                     imagen_subida.seek(0)
                     bytes_imagen = imagen_subida.read()
@@ -168,10 +176,10 @@ with pestaña_tiendas:
                     st.error(f"Error de conexión con la IA: {api_err}")
                     error_detectado = True
 
-                # FLUJO LINEAL POST-API (FUERA DE CUALQUIER BLOQUE TRY ANIDADO)
+                # FLUJO SEGURO 100% LINEAL
                 if not error_detectado and texto_respuesta:
                     if "doctype" in texto_respuesta.lower() or "<html" in texto_respuesta.lower():
-                        st.error("El servidor de Together AI está saturado. Pulsa el botón de nuevo.")
+                        st.error("El servidor de la IA está saturado. Pulsa el botón de nuevo.")
                     else:
                         inicio_json = texto_respuesta.find("{")
                         fin_json = texto_respuesta.rfind("}") + 1
@@ -180,7 +188,7 @@ with pestaña_tiendas:
                             try:
                                 datos = json.loads(texto_respuesta[inicio_json:fin_json])
                                 
-                                # Extracción de parámetros individuales segura
+                                # Procesar fecha de forma aislada e independiente
                                 f_str = datos.get("fecha", "")
                                 st.session_state.fecha_detectada = datetime.date.today()
                                 if len(f_str) == 10:
@@ -192,18 +200,16 @@ with pestaña_tiendas:
                                 if datos.get("tienda") in LISTA_TIENDAS:
                                     st.session_state.tienda_detectada = datos.get("tienda")
                                 
+                                # Mapeo usando la función de conversión segura sin sub-bloques try/except
                                 st.session_state.encargado_detectado = str(datos.get("encargado", ""))
-                                st.session_state.venta_neta_detectada = float(datos.get("venta_neta", 0.0))
-                                st.session_state.venta_detectada = float(datos.get("venta_total", 0.0))
-                                st.session_state.venta_2025_detectada = float(datos.get("venta_2025", 0.0))
-                                st.session_state.venta_entrega_detectada = float(datos.get("venta_entrega", 0.0))
-                                st.session_state.venta_llevar_detectada = float(datos.get("venta_llevar", 0.0))
-                                st.session_state.venta_ventana_detectada = float(datos.get("venta_ventana", 0.0))
-                                st.session_state.venta_come_bebe_detectada = float(datos.get("venta_come_bebe", 0.0))
-                                st.session_state.venta_visa_detectada = float(datos.get("venta_visa", 0.0))
-                                st.session_state.venta_efectivo_detectada = float(datos.get("venta_efectivo", 0.0))
-                                st.session_state.venta_pluxee_detectada = float(datos.get("venta_pluxee", 0.0))
-                                st.session_state.quebranto_detectado = float(datos.get("quebranto", 0.0))
-                                st.session_state.ingreso_prosegur_detectada = float(datos.get("ingreso_prosegur", 0.0))
-                                st.session_state.web_detectada = float(datos.get("web", 0.0))
-                                st.session_state.tgtg_detectada = float(datos.get("tgtg", 0.0))
+                                st.session_state.venta_neta_detectada = convertir_a_float(datos.get("venta_neta"))
+                                st.session_state.venta_detectada = convertir_a_float(datos.get("venta_total"))
+                                st.session_state.venta_2025_detectada = convertir_a_float(datos.get("venta_2025"))
+                                st.session_state.venta_entrega_detectada = convertir_a_float(datos.get("venta_entrega"))
+                                st.session_state.venta_llevar_detectada = convertir_a_float(datos.get("venta_llevar"))
+                                st.session_state.venta_ventana_detectada = convertir_a_float(datos.get("venta_ventana"))
+                                st.session_state.venta_come_bebe_detectada = convertir_a_float(datos.get("venta_come_bebe"))
+                                st.session_state.venta_visa_detectada = convertir_a_float(datos.get("venta_visa"))
+                                st.session_state.venta_efectivo_detectada = convertir_a_float(datos.get("venta_efectivo"))
+                                st.session_state.venta_pluxee_detectada = convertir_a_float(datos.get("venta_pluxee"))
+                                st.session_state.quebranto_detectado = convertir_a_float(datos.get("quebranto"))
