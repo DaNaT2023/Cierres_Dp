@@ -18,12 +18,8 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# Inicializar de forma segura la variable de autenticación en la sesión
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-
 # ==========================================
-# 1. BASE DE DATOS LOCAL CON TU NUEVA ESTRUCTURA HORIZONTAL
+# 1. BASE DE DATOS LOCAL CON TU ESTRUCTURA HORIZONTAL
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("pizzerias.db")
@@ -174,13 +170,13 @@ with pestaña_tiendas:
                     venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, 
                     venta_come_bebe, venta_visa, venta_efectivo, quebranto, ingreso_prosegur, 
                     produccion_real, espera_rack, media_reparto, pedidos_mas_45, pedidos_mas_10_min, 
-                    web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, estado_alerta
+                    web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, total_pedidos, deliverys, venta_neta,
                 venta, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
                 venta_efectivo, quebranto, ingreso_prosegur, produccion_real, espera_rack, media_reparto,
-                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, "OK"
+                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo
             ))
             conn.commit()
             conn.close()
@@ -190,19 +186,23 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (NUEVO CONTROL DE ACCESO LINEAL)
+# SECCIÓN: PANEL DEL PROPIETARIO (CONTROL EN SIDEBAR INDEPENDIENTE)
 # ------------------------------------------
 with pestaña_dueño:
-    # Formulario limpio de contraseña plano
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido al Propietario")
-        input_usuario = st.text_input("Usuario Administrador", key="login_user_propietario")
-        input_password = st.text_input("Contraseña Administrador", type="password", key="login_pass_propietario")
+    st.sidebar.markdown("### 🔒 Control de Acceso")
+    pass_input = st.sidebar.text_input("Introduce la Contraseña de Propietario:", type="password", key="pass_propietario_sidebar")
+    
+    # Comprobación de contraseña en una línea plana que Streamlit recuerda al recargar
+    if pass_input == st.secrets["ADMIN_PASSWORD"]:
+        st.subheader("📊 Resumen General de Cierres")
         
-        if st.button("🔓 Desbloquear Histórico", key="btn_autenticar_propietario"):
-            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("Credenciales incorrectas.")
-                
+        conn = sqlite3.connect("pizzerias.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
+        
+        if df.empty:
+            st.warning("📥 La base de datos local está limpia. Guarda el primer turno desde la pestaña anterior para ver la información.")
+        else:
+            opciones_tiendas_filtro = ["Todas las Tiendas"] + LISTA_TIENDAS
+            tienda_seleccionada = st.selectbox("Filtrar por Tienda:", opciones_tiendas_filtro, index=0, key="selector_unico_tienda_propietario")
+            
