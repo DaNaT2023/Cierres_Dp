@@ -181,8 +181,34 @@ with pestaña_dueño:
 
     df_vista = st.session_state.df_original
 
+    # NUEVO CONTROL SEGURO: Si la base de datos se borró por completo tras un reinicio de la nube
     if df_vista.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
+        st.markdown("### 🔄 Restaurar Copia de Seguridad")
+        st.caption("Si la aplicación sufrió un reseteo, sube aquí tu último archivo .xls o .xlsx guardado para recuperar el historial de inmediato:")
+        
+        archivo_subido = st.file_uploader("Selecciona el archivo de copia de seguridad:", type=["xls", "xlsx"], key="recuperacion_vacia_dueño")
+        if archivo_subido is not None:
+            try:
+                # Leemos el archivo restaurado interpretando las tablas HTML universales o nativas
+                df_recuperado = pd.read_html(archivo_subido)[0] if archivo_subido.name.endswith('.xls') else pd.read_excel(archivo_subido)
+                
+                # Mapeamos a la inversa las columnas al español para inyectar en SQLite
+                mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
+                df_recuperado_bd = df_recuperado.rename(columns=mapeo_inverso_bd)
+                
+                conn = sqlite3.connect("tiendas.db")
+                # Insertamos todo de golpe reescribiendo la tabla local vacía
+                df_recuperado_bd.to_sql("recuadros", conn, if_exists="append", index=False)
+                conn.close()
+                
+                st.success("¡Historial completo restaurado con éxito de forma inmediata!")
+                if "df_original" in st.session_state:
+                    del st.session_state.df_original
+                time.sleep(1)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al procesar la copia de seguridad: {e}. Asegúrate de subir el archivo correcto.")
     else:
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -195,11 +221,12 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        # FIJACIÓN DE CARACTERES: Inyectamos la cabecera meta-charset para afinar eñes y tildes en Excel
+        # Generar archivo de descarga universal afinado con UTF-8
         html_crudo = df_vista.to_html(index=False)
         html_perfecto = f"<meta charset='utf-8'>\n{html_crudo}"
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
+        # Formateo visual arriba: 3 métricas, 1 botón de descarga y 1 caja de restauración rápida
         col_m1, col_m2, col_m3, col_btn_descarga = st.columns(4)
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
@@ -216,6 +243,33 @@ with pestaña_dueño:
                 use_container_width=True,
                 key="btn_descarga_seguridad_propietario"
             )
+            
+        # ZONA DE IMPORTACIÓN DIRECTA CUANDO LA TABLA SÍ CONTIENE DATOS
+        st.markdown(" ")
+        with st.expander("🔄 Importar / Añadir cierres desde un archivo Excel externo"):
+            archivo_añadir = st.file_uploader("Sube tu archivo .xls o .xlsx para añadir turnos acumulados:", type=["xls", "xlsx"], key="recuperacion_activa_dueño")
+            if archivo_añadir is not None:
+                if st.button("⚡ Confirmar inserción masiva de datos", use_container_width=True, type="secondary"):
+                    try:
+                        df_extraido = pd.read_html(archivo_añadir)[0] if archivo_añadir.name.endswith('.xls') else pd.read_excel(archivo_añadir)
+                        mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
+                        df_extraido_bd = df_extraido.rename(columns=mapeo_inverso_bd)
+                        
+                        # Si en el excel vienen columnas viejas como el ID autonumérico, lo eliminamos para evitar duplicados
+                        if "id" in df_extraido_bd.columns:
+                            df_extraido_bd = df_extraido_bd.drop(columns=["id"])
+                            
+                        conn = sqlite3.connect("tiendas.db")
+                        df_extraido_bd.to_sql("recuadros", conn, if_exists="append", index=False)
+                        conn.close()
+                        
+                        st.success("¡Datos inyectados y consolidados correctamente en la tabla!")
+                        if "df_original" in st.session_state:
+                            del st.session_state.df_original
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error en la importación: {e}")
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
