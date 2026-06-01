@@ -133,7 +133,7 @@ with pestaña_tiendas:
                 parametros_url = urllib.parse.urlencode({campo_entry: cadena_datos})
                 url_get_completa = f"{url_form_base}?{parametros_url}"
                 
-                # Lanzar la petición simulando agente Chrome
+                # Lanzar la petición simulando agente Chrome público
                 cabeceras_navegador = {'User-Agent': 'Mozilla/5.0'}
                 peticion_segura = urllib.request.Request(url_get_completa, headers=cabeceras_navegador)
                 
@@ -147,7 +147,7 @@ with pestaña_tiendas:
                 st.error(f"Error al transmitir los datos: {e}. Revisa las direcciones de tus Secrets.")
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA EXTRACCIÓN EXTRA-CORREGIDA LÍNEA 183)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (ESTRUCTURA PLANA CORREGIDA EMBEDDED)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
@@ -161,13 +161,11 @@ with pestaña_dueño:
         st.success("🔓 Concedido acceso completo al histórico.")
         st.markdown("---")
         
+        # FIJADO DE LA ID REAL DE TU EXCEL DIRECTAMENTE EN EL CÓDIGO (EVITA ERROR 183 Y SYNTAXERROR)
+        sheet_id = "1p8Cy9FNukaXNQ6LZnPXLPhpHsifL0oCW7N1WqtBTcbk"
+        url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=1296960697"
+        
         try:
-            url_base = st.secrets["URL_GOOGLE_SHEETS"]
-            # CORRECCIÓN DE LA LÍNEA 183: Extracción matemática exacta usando índices correctos
-            sheet_id = url_base.split("/d/")[1].split("/")[0]
-            
-            # Conexión directa a la pestaña morada de Google Forms (gid=1296960697)
-            url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=1296960697"
             df_crudo = pd.read_csv(url_csv)
             
             columnas_finales = [
@@ -181,6 +179,9 @@ with pestaña_dueño:
             
             listado_filas = []
             for _, fila in df_crudo.iterrows():
-                # En la pestaña vinculada, las respuestas siempre se almacenan en la columna 'Datos' (columna 2)
                 if len(fila) >= 2:
-                    texto_celda = str(fila.iloc[1])
+                    texto_celda = str(fila.iloc[1]) # Extrae el texto de la columna de datos
+                    partes = texto_celda.split(",")
+                    if len(partes) >= 28:
+                        listado_filas.append(partes[:28])
+            
