@@ -189,23 +189,20 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA DE LÍNEA HORIZONTAL COMPLETA CORREGIDA)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA LINEAL PLANA DEFINITIVA ANTIMAPAS)
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("🔒 Panel de Control del Administrator")
+    st.subheader("🔒 Panel de Control del Administrador")
     clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
     
-    if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
-        st.info("Escribe las credenciales arriba para activar la tabla de control.")
-        st.stop()
-
-    st.success("🔓 Concedido acceso completo al histórico horizontal.")
-    st.markdown("---")
-    
-    # Carga lineal directa de la base de datos
-    conn = sqlite3.connect("pizzerias_final.db")
-    df_db = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
-    
-    # Nombres de las columnas en horizontal exactos de tu lista
-    columnas_horizontales = [
+    # Comprobación de seguridad directa en un único paso
+    if clave_ingresada == st.secrets["ADMIN_PASSWORD"]:
+        st.success("🔓 Concedido acceso completo al histórico horizontal.")
+        st.markdown("---")
+        
+        conn = sqlite3.connect("pizzerias_final.db")
+        df_db = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
+        
+        columnas_horizontales = [
+            "Fecha", "Tienda", "Turno", "Encargado", "Total Pedidos", "Deliverys", 
