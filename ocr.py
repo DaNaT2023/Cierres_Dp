@@ -126,16 +126,15 @@ with pestaña_tiendas:
                 # Empaquetamos los 28 datos en una sola línea de texto limpia
                 cadena_datos = f"{fecha.strftime('%Y-%m-%d')},{tienda},{turno_seleccionado},{encargado},{total_pedidos},{deliverys},{venta_neta},{venta},{venta_2025},{venta_entrega},{venta_llevar},{venta_ventana},{venta_come_bebe},{venta_visa},{venta_efectivo},{quebranto},{ingreso_prosegur},{produccion_real},{espera_rack},{media_reparto},{pedidos_mas_45},{pedidos_mas_10_min},{web},{tgtg},{uber_eats},{glovo},{just_eat},{cancelados_motivo.replace(',', ' ')}"
                 
-                # REPARACIÓN RADICAL: Envío mediante simulación GET limpia nativa por cabecera de navegador (Evita error 401)
-                url_form_base = st.secrets["URL_GOOGLE_FORM"].replace("/formResponse", "/formResponse")
+                url_form_base = st.secrets["URL_GOOGLE_FORM"]
                 campo_entry = st.secrets["ENTRY_ID"]
                 
-                # Montar la URL completa con los datos codificados directamente en la barra de direcciones
+                # Montar la URL completa con los datos codificados
                 parametros_url = urllib.parse.urlencode({campo_entry: cadena_datos})
                 url_get_completa = f"{url_form_base}?{parametros_url}"
                 
-                # Lanzar la petición simulando un agente de navegador Chrome normal
-                cabeceras_navegador = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                # Lanzar la petición simulando agente Chrome
+                cabeceras_navegador = {'User-Agent': 'Mozilla/5.0'}
                 peticion_segura = urllib.request.Request(url_get_completa, headers=cabeceras_navegador)
                 
                 with urllib.request.urlopen(peticion_segura) as respuesta:
@@ -148,7 +147,7 @@ with pestaña_tiendas:
                 st.error(f"Error al transmitir los datos: {e}. Revisa las direcciones de tus Secrets.")
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA DIRECTA DE LA HOJA DE RESPUESTAS)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA EXTRACCIÓN EXTRA-CORREGIDA LÍNEA 183)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
@@ -164,7 +163,7 @@ with pestaña_dueño:
         
         try:
             url_base = st.secrets["URL_GOOGLE_SHEETS"]
-            # Extraer de forma segura el ID del documento
+            # CORRECCIÓN DE LA LÍNEA 183: Extracción matemática exacta usando índices correctos
             sheet_id = url_base.split("/d/")[1].split("/")[0]
             
             # Conexión directa a la pestaña morada de Google Forms (gid=1296960697)
@@ -181,3 +180,7 @@ with pestaña_dueño:
             ]
             
             listado_filas = []
+            for _, fila in df_crudo.iterrows():
+                # En la pestaña vinculada, las respuestas siempre se almacenan en la columna 'Datos' (columna 2)
+                if len(fila) >= 2:
+                    texto_celda = str(fila.iloc[1])
