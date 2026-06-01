@@ -103,7 +103,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (VISTA LIMPIA Y FORMATEADA)
+# SECCIÓN: PANEL DEL PROPIETARIO (EDICIÓN DIRECTA)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("📊 Resumen General de Cierres")
@@ -123,23 +123,21 @@ with pestaña_dueño:
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
         # Filtrado base
-        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
+        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
         
-        # Ocultamos los desgloses irrelevantes para el dueño
-        columnas_a_eliminar = [
-            'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 
-            'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe'
-        ]
-        df_vista = df_filtrado.drop(columns=[col for col in columnas_a_eliminar if col in df_filtrado.columns])
-        
-        # Renombramos etiquetas para la cabecera de la tabla
-        columnas_nuevas_etiquetas = {
+        # Mapeo de nombres internos a etiquetas bonitas para mostrar al usuario
+        columnas_mapeo = {
             'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
             'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
             'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
             'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
         }
-        df_vista = df_vista.rename(columns=columnas_nuevas_etiquetas)
+        
+        # Inverso del mapeo para saber qué columna real de la BD se está editando
+        mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
+        
+        # Creamos una vista filtrada solo con las columnas del propietario y nombres limpios
+        df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
         
         # Métricas principales superiores
         st.markdown("### 📈 Métricas del Grupo")
@@ -152,14 +150,17 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
-        st.subheader("📋 Tabla Histórica de Cierres")
+        st.subheader("📝 Tabla Histórica de Cierres (Doble clic para editar o pulsa Supr para borrar filas)")
+        st.caption("💡 Nota: Puedes modificar cualquier celda directamente. Si deseas eliminar un turno completo, selecciónalo y pulsa la tecla 'Suprimir' en tu teclado. Al terminar, dale al botón verde de abajo para guardar.")
         
-        # Aplicamos el formato de moneda (€) solo a las columnas de dinero en la visualización
-        st.dataframe(
+        # Activamos el editor interactivo de datos (st.data_editor)
+        tabla_editada = st.data_editor(
             df_vista, 
             use_container_width=True, 
             hide_index=True,
+            num_rows="dynamic",  # Permite al usuario borrar filas usando la tecla Supr/Delete
             column_config={
+                "ID": st.column_config.NumberColumn(disabled=True), # El ID no se puede editar por seguridad
                 "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
                 "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
                 "Venta 2025": st.column_config.NumberColumn(format="%.2f €"),
@@ -168,5 +169,16 @@ with pestaña_dueño:
                 "Pluxee": st.column_config.NumberColumn(format="%.2f €"),
                 "Quebranto": st.column_config.NumberColumn(format="%.2f €"),
                 "Prosegur": st.column_config.NumberColumn(format="%.2f €"),
-            }
+                "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
+                "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
+            },
+            key="editor_propietario"
         )
+        
+        # Botón para consolidar los cambios en el archivo tiendas.db
+        if st.button("💾 Guardar Cambios en la Base de Datos", type="primary", use_container_width=True):
+            conn = sqlite3.connect("tiendas.db")
+            cursor = conn.cursor()
+            
+            # 1. Detectar filas eliminadas en la interfaz de Streamlit
+            estado_editor = st.session_state["editor_propietario"]
