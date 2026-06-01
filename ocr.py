@@ -19,10 +19,11 @@ LISTA_TIENDAS = [
 ]
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL COMPLETA
+# 1. BASE DE DATOS LOCAL RENOMBRADA (SISTEMA DE LIMPIEZA ANTICORRUPCIÓN)
 # ==========================================
 def inicializar_bd():
-    conexion = sqlite3.connect("tiendas.db")
+    # Cambiamos el archivo a pizzerias.db para forzar la creación de una base de datos nueva y limpia
+    conexion = sqlite3.connect("pizzerias.db")
     cursor = conexion.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS recuadros (
@@ -169,8 +170,8 @@ with pestaña_tiendas:
             elif quebranto >= 100:
                 alerta = "⚠️ ATENCIÓN (Exceso)"
                 
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
+            conexion_guardar = sqlite3.connect("pizzerias.db")
+            cursor = conexion_guardar.cursor()
             cursor.execute("""
                 INSERT INTO recuadros (
                     fecha, tienda, turno, encargado, total_pedidos, deliverys, venta_neta, 
@@ -185,8 +186,8 @@ with pestaña_tiendas:
                 venta_efectivo, quebranto, ingreso_prosegur, produccion_real, espera_rack, media_reparto,
                 pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, alerta
             ))
-            conn.commit()
-            conn.close()
+            conexion_guardar.commit()
+            conexion_guardar.close()
             
             st.success(f"¡El cierre de {tienda} ({turno_seleccionado}) se ha guardado correctamente!")
             time.sleep(1)
@@ -198,15 +199,11 @@ with pestaña_tiendas:
 with pestaña_dueño:
     st.subheader("📊 Resumen General de Cierres")
     
-    conn = sqlite3.connect("tiendas.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
+    conexion_leer = sqlite3.connect("pizzerias.db")
+    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conexion_leer)
+    conexion_leer.close()
     
-    # CONTROL DE SEGURIDAD TOTAL: Si no hay filas, avisa de forma limpia y evita el cuelgue
     if df.empty:
-        st.warning("📥 La base de datos está actualmente vacía. Rellena y guarda el primer turno desde la pestaña de envío para activar el histórico.")
+        st.warning("📥 Base de datos vacía y limpia. Envía el primer turno desde la pestaña de envío para activar el histórico.")
     else:
         tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-        if not tiendas_filtro:
-            tiendas_filtro = LISTA_TIENDAS
-            
