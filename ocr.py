@@ -113,7 +113,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Sin bloqueos)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Llama 90B Vision)..."):
                 try:
                     imagen_subida.seek(0)
                     bytes_imagen = imagen_subida.read()
@@ -130,7 +130,7 @@ with pestaña_tiendas:
                     Reglas críticas de extracción:
                     1. Identifica las columnas 'Turno Mañana' y 'Turno Noche'. Extrae los datos de la columna correspondiente al turno solicitado.
                     2. Si un valor numérico está unificado, centrado o solo aparece una cifra para todo el día (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único independientemente del turno seleccionado.
-                    3. Devuelve los datos estrictamente en este formato JSON, sin texto adicional, sin bloques de código markdown, solo el objeto JSON limpio:
+                    3. Devuelve los datos estrictamente en este formato JSON, sin texto adicional explicativo, sin bloques de código markdown, solo el objeto JSON limpio:
                     {{
                         "fecha": "DD/MM/AAAA",
                         "tienda": "Especifica el nombre de la tienda si aparece, o dejas vacío",
@@ -155,8 +155,9 @@ with pestaña_tiendas:
                     }}
                     """
                     
+                    # Llamada corregida usando el modelo avanzado compatible Llama 3.2 90B Vision
                     response = client.chat.completions.create(
-                        model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+                        model="meta-llama/Llama-3.2-90B-Vision-Instruct",
                         messages=[
                             {
                                 "role": "user",
@@ -208,6 +209,3 @@ with pestaña_tiendas:
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"Error al conectar con el motor de Together AI: {e}. Puedes rellenar los datos manualmente abajo.")
-
-    st.markdown("---")
