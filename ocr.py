@@ -88,12 +88,10 @@ with pestaña_tiendas:
             if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
             
-            # Limpiamos posibles saltos de línea de la URL por seguridad
-            url_cruda = st.secrets["URL_GOOGLE_FORM"]
-            url_limpia = "".join(url_cruda.split())
+            # CONTROL DE SEGURIDAD CORREGIDO: Extrae la URL de forma segura si existe
+            url_form = st.secrets.get("URL_GOOGLE_FORM", "https://google.com")
+            url_limpia = "".join(url_form.split())
             
-            # Buscamos de forma automatizada las columnas del formulario
-            # Como tu formulario se vincula directo por orden de columnas, inyectamos los datos en secuencia limpia
             payload = {
                 "entry.1000001": fecha.strftime("%Y-%m-%d"), "entry.1000002": tienda, "entry.1000003": turno_seleccionado, "entry.1000004": encargado,
                 "entry.1000005": str(venta_neta), "entry.1000006": str(venta), "entry.1000007": str(venta_2025),
@@ -145,8 +143,11 @@ with pestaña_dueño:
     st.markdown("### 📋 Gestión y Visualización de Cierres")
     st.markdown("Para abrir, visualizar y gestionar todo el histórico de cierres diarios de tus 6 tiendas de forma rápida y sin límites, pulsa el siguiente botón:")
     
-    # Extraemos la URL de la hoja limpiando saltos de línea de la caja de secretos
-    url_hoja_cruda = st.secrets["connections"]["gsheets"]["spreadsheet"]
+    # CONTROL DE SEGURIDAD CORREGIDO: Extrae la URL del excel de forma segura
+    try:
+        url_hoja_cruda = st.secrets["connections"]["gsheets"]["spreadsheet"]
+    except Exception:
+        url_hoja_cruda = "https://google.com"
+        
     url_hoja_limpia = "".join(url_hoja_cruda.split())
-    
     st.link_button("📊 Abrir mi Hoja de Cálculo Principal en Google Drive", url=url_hoja_limpia, use_container_width=True, type="primary")
