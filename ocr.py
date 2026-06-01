@@ -195,8 +195,9 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        # PROCESADOR DE COPIA DE SEGURIDAD EN FORMATO HTML COMPATIBLE NATALMENTE CON EXCEL (.XLS)
-        html_datos = df_vista.to_html(index=False)
+        # FIJACIÓN DE CARACTERES: Inyectamos la cabecera meta-charset para afinar eñes y tildes en Excel
+        html_crudo = df_vista.to_html(index=False)
+        html_perfecto = f"<meta charset='utf-8'>\n{html_crudo}"
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
         col_m1, col_m2, col_m3, col_btn_descarga = st.columns(4)
@@ -207,10 +208,9 @@ with pestaña_dueño:
         with col_m3:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         with col_btn_descarga:
-            # Descargamos el archivo como .xls (Formulario Excel HTML universal que abre directo de un clic)
             st.download_button(
                 label="📥 Descargar copia seguridad (.xls)",
-                data=html_datos,
+                data=html_perfecto,
                 file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.xls",
                 mime="application/vnd.ms-excel",
                 use_container_width=True,
