@@ -101,7 +101,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO MANUAL)
+# SECCIÓN: ENVÍO DE TIENDAS (MANTENIDO INTACTO)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -161,7 +161,7 @@ with pestaña_tiendas:
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
         if encargado.strip() == "":
-            st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
+            st.error("Por favor, introduce el nombre del encargado.")
         else:
             alerta = "OK"
             if quebranto <= -100:
@@ -193,7 +193,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (CON CLAVE BLINDADA LINEAL)
+# SECCIÓN: PANEL DEL PROPIETARIO (IDEA 3 IMPLEMENTADA)
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
@@ -205,6 +205,8 @@ with pestaña_dueño:
         input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
         
         if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
-            # Validación lineal limpia sin anidamientos de espacios peligrosos
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
                 st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
