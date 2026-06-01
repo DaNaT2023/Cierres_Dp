@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-from PIL import Image
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -16,31 +15,6 @@ LISTA_TIENDAS = [
     "Dp Galapagar",
     "Dp Vicálvaro"
 ]
-
-# Inicializar variables en el estado de la sesión
-if "tienda_detectada" not in st.session_state:
-    st.session_state.tienda_detectada = "Dp Valdebebas"
-if "encargado_detectado" not in st.session_state:
-    st.session_state.encargado_detectado = ""
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-
-# Inicializar nuevas variables financieras en el estado de la sesión
-NUEVOS_CAMPOS = [
-    "fecha_detectada", "venta_neta_detectada", "venta_2025_detectada", 
-    "venta_entrega_detectada", "venta_llevar_detectada", "venta_ventana_detectada", 
-    "venta_come_bebe_detectada", "venta_visa_detectada", "venta_efectivo_detectada", 
-    "venta_pluxee_detectada", "ingreso_prosegur_detectada", "web_detectada", 
-    "tgtg_detectada", "uber_eats_detectada", "glovo_detectada", "just_eat_detectada",
-    "quebranto_detectado", "venta_detectada"
-]
-
-for campo in NUEVOS_CAMPOS:
-    if campo not in st.session_state:
-        if "fecha" in campo:
-            st.session_state[campo] = datetime.date.today()
-        else:
-            st.session_state[campo] = 0.0
 
 # ==========================================
 # 1. BASE DE DATOS LOCAL
@@ -83,19 +57,20 @@ inicializar_bd()
 # ==========================================
 # 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
-# Intentar cargar el logotipo personalizado. Si no se encuentra, usa el emoji por defecto de seguridad
+# Intentar cargar el logotipo personalizado de Domino's Pizza
 try:
+    from PIL import Image
     img_logo = Image.open("logo.png")
     st.set_page_config(page_title="Panel Cierre Diario Dp", page_icon=img_logo, layout="wide")
 except:
-    st.set_page_config(page_title="Panel Cierre Diario Dp 🍕", layout="wide")
+    st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
-# Cabecera de la página web con el logotipo insertado de forma elegante
+# Cabecera de la página web con el logotipo insertado
 if img_logo is not None:
-    col_logo, col_titulo = st.columns([1, 10])
+    col_logo, col_titulo = st.columns([1, 15])
     with col_logo:
-        st.image(img_logo, width=70)
+        st.image(img_logo, width=60)
     with col_titulo:
         st.title("Panel Cierre Diario Dp")
 else:
@@ -111,10 +86,7 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
     
-    col_pre1, col_pre2 = st.columns(2)
-    with col_pre1:
-        turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
-    
+    turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     st.markdown("---")
     
     # Formulario compacto de 3 columnas adaptado a pantallas de móviles
@@ -189,7 +161,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (TOTALMENTE LINEAL)
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
@@ -222,5 +194,18 @@ with pestaña_dueño:
         if df.empty:
             st.info("Aún no se han registrado cierres en la base de datos.")
         else:
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
+            # Lógica secuencial plana sin bloques 'with' de columnas para evitar fallos
+            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+            alertas_disponibles = list(df['estado_alerta'].unique())
+            alertas_filtro = st.multiselect("Filtrar por Estado:", options=alertas_disponibles, default=alertas_disponibles)
+            
+            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
+            
+            st.markdown("### 📈 Métricas")
+            st.metric("Venta Bruta Total del Grupo", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            st.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            st.write(f"Turnos totales registrados en el filtro: {len(df_filtrado)}")
+            
+            st.markdown("---")
+            st.subheader("📋 Histórico de Turnos")
+            st.dataframe(df_filtrado, use_container_width=True)
