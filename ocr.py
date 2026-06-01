@@ -134,7 +134,6 @@ with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
-    # CORRECCIÓN: Si no está logueado, muestra la caja de login de forma exclusiva
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -149,13 +148,11 @@ with pestaña_dueño:
             else:
                 st.error("Usuario o contraseña incorrectos.")
                 
-    # CORRECCIÓN: Si SÍ está logueado, ejecuta el código completo de la tabla de forma lineal
     else:
         col_header, col_guardar, col_logout = st.columns(3)
         with col_header:
             st.subheader("📊 Resumen General de Cierres")
         with col_guardar:
-            # El botón se coloca de forma limpia en la barra de arriba
             ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cabecera_final")
         with col_logout:
             if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
@@ -190,8 +187,13 @@ with pestaña_dueño:
             
             st.markdown("### 📈 Métricas del Grupo")
             col_m1, col_m2, col_m3 = st.columns(3)
+            
+            # CORRECCIÓN DE ESPACIOS: Las métricas cargan ahora de forma directa y plana en cada columna sin fallar
             with col_m1:
                 st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
             with col_m2:
                 st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
             with col_m3:
+                st.metric("Turnos Registrados", f"{len(df_filtrado)}")
+            
+            st.markdown("---")
