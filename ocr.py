@@ -194,8 +194,9 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
+        st.caption("💡 Modifica las celdas directamente en la tabla y pulsa el botón azul de abajo al terminar para recalcular el Estado.")
         
-        # SOLUCIÓN DEFINITIVA: Formulario contenedor oficial con la sintaxis correcta
-        with st.form(key="formulario_edicion_propietario"):
-            tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        # ELIMINADO EL FORMULARIO POR COMPLETO: Renderizado directo sin posibilidad de error rosa
+        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        
+        # Botón normal plano fuera de formularios
