@@ -196,5 +196,6 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
         
-        # ELIMINADO EL BLOQUE FORM: Renderizado directo e inmune a errores de submit
-        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        # SOLUCIÓN DEFINITIVA: Formulario contenedor oficial con la sintaxis correcta
+        with st.form(key="formulario_edicion_propietario"):
+            tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
