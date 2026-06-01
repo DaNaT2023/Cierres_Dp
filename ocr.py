@@ -76,7 +76,7 @@ def obtener_imagen_base64(ruta_imagen):
 
 logo_base64 = obtener_imagen_base64("logo.png")
 
-# CABECERA: Alineada y cargando el logo directamente de forma local
+# CABECERA PERFECTA: Alineada, junta y cargando el logo directamente de forma local
 if logo_base64:
     st.markdown(
         f"""
