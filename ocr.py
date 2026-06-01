@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
+import base64
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
@@ -28,9 +29,35 @@ def inicializar_bd():
 
 inicializar_bd()
 
-# CONFIGURACIÓN BÁSICA DE PÁGINA
+# ==========================================
+# 2. CONFIGURACIÓN DE PÁGINA Y LOGO CORPORATIVO
+# ==========================================
 st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
-st.title("🍕 Panel Cierre Diario Dp")
+
+# Función segura para transformar tu logo.png de GitHub en código Base64 para HTML
+def obtener_logo_base64(ruta_imagen):
+    try:
+        with open(ruta_imagen, "rb") as archivo_img:
+            return base64.b64encode(archivo_img.read()).decode()
+    except Exception:
+        return None
+
+logo_codificado = obtener_logo_base64("logo.png")
+
+# CABECERA INTERACTIVA: Si existe logo.png lo coloca alineado, si no, usa la pizza de respaldo
+if logo_codificado:
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 15px; margin-top: -15px;">
+            <img src="data:image/png;base64,{logo_codificado}" width="65" style="object-fit: contain; border-radius: 4px;">
+            <h1 style="margin: 0; padding: 0; font-size: 2.3rem; font-weight: 700; color: #31333F;">Panel Cierre Diario Dp</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.title("🍕 Panel Cierre Diario Dp")
+
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
@@ -109,7 +136,6 @@ with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
-    # SISTEMA DE SEGURIDAD LINEAL
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -125,7 +151,6 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    # CORRECCIÓN AQUÍ: Definimos explícitamente las 2 columnas pasándole un entero (2)
     col_header, col_logout = st.columns(2)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
@@ -177,24 +202,3 @@ with pestaña_dueño:
             df_vista, 
             use_container_width=True, 
             hide_index=True,
-            num_rows="dynamic",
-            key="editor_propietario"
-        )
-        
-        if st.button("💾 Guardar Cambios en la Base de Datos", type="primary", use_container_width=True):
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
-            
-            estado_editor = st.session_state["editor_propietario"]
-            
-            filas_borradas = estado_editor.get("deleted_rows", [])
-            if filas_borradas:
-                for idx in filas_borradas:
-                    id_a_borrar = int(df_vista.iloc[idx]["ID"])
-                    cursor.execute("DELETE FROM recuadros WHERE id = ?", (id_a_borrar,))
-            
-            filas_modificadas = estado_editor.get("edited_rows", {})
-            for idx_str, cambios in filas_modificadas.items():
-                idx = int(idx_str)
-                id_registro = int(df_vista.iloc[idx]["ID"])
-                
