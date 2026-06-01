@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-from openai import OpenAI
+import requests
 import base64
 import json
 from PIL import Image
@@ -48,7 +48,6 @@ for campo in NUEVOS_CAMPOS:
         else:
             st.session_state[campo] = 0.0
 
-# Función auxiliar para convertir valores a float de forma segura
 def convertir_a_float(valor):
     if valor is None:
         return 0.0
@@ -122,7 +121,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Vía Directa)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -131,87 +130,77 @@ with pestaña_tiendas:
                     bytes_imagen = imagen_subida.read()
                     imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
                     
-                    client = OpenAI(
-                        base_url="https://together.xyz",
-                        api_key=st.secrets["TOGETHER_API_KEY"]
-                    )
+                    # Definición de las instrucciones para la extracción de datos financieros
+                    prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, sin bloques markdown ni explicaciones."
                     
-                    prompt_ocr = f"""
-                    Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: **{turno_seleccionado}**.
-                    Reglas:
-                    1. Extrae los datos de la columna correspondiente al turno solicitado ({turno_seleccionado}).
-                    2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único.
-                    3. Devuelve los datos estrictamente en este formato JSON, sin código markdown, solo el objeto JSON limpio:
-                    {{
-                        "fecha": "DD/MM/AAAA",
-                        "tienda": "Nombre exacto",
-                        "encargado": "Nombre del encargado",
-                        "venta_neta": 0.0,
-                        "venta_total": 0.0,
-                        "venta_2025": 0.0,
-                        "venta_entrega": 0.0,
-                        "venta_llevar": 0.0,
-                        "venta_ventana": 0.0,
-                        "venta_come_bebe": 0.0,
-                        "venta_visa": 0.0,
-                        "venta_efectivo": 0.0,
-                        "venta_pluxee": 0.0,
-                        "quebranto": 0.0,
-                        "ingreso_prosegur": 0.0,
-                        "web": 0.0,
-                        "tgtg": 0.0,
-                        "uber_eats": 0.0,
-                        "glovo": 0.0,
-                        "just_eat": 0.0
-                    }}
-                    """
-                    
-                    response = client.chat.completions.create(
-                        model="meta-llama/Llama-3.2-90B-Vision-Instruct",
-                        messages=[{"role": "user", "content": [{"type": "text", "text": prompt_ocr}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{imagen_base64}"}}]}],
-                        temperature=0.1
+                    # Conexión HTTP directa sin usar librerías intermedias que fallen
+                    url = "https://together.xyz"
+                    headers = {
+                        "Authorization": f"Bearer {st.secrets['TOGETHER_API_KEY']}",
+                        "Content-Type": "application/json"
                     )
-                    texto_respuesta = response.choices.message.content.strip()
+                    payload = {
+                        "model": "meta-llama/Llama-3.2-90B-Vision-Instruct",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt_ocr},
+                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{imagen_base64}"}}
+                                ]
+                            }
+                        ],
+                        "temperature": 0.1
+                    }
+                    
+                    response = requests.post(url, headers=headers, json=payload)
+                    
+                    if response.status_code == 200:
+                        resultado_json = response.json()
+                        texto_respuesta = resultado_json['choices'][0]['message']['content'].strip()
+                    else:
+                        st.error(f"El servidor de Together AI rechazó la clave o la conexión (Código {response.status_code}). Verifica tu API Key en los secretos.")
+                        error_detectado = True
+                        
                 except Exception as api_err:
-                    st.error(f"Error de conexión con la IA: {api_err}")
+                    st.error(f"Error de red: {api_err}")
                     error_detectado = True
 
-                # FLUJO SEGURO 100% LINEAL SIN CONFUSIÓN DE INDENTACIÓN
+                # PROCESAMIENTO SEGURO DEL JSON (FUERA DE LOS BLOQUES DE CONEXIÓN)
                 if not error_detectado and texto_respuesta:
-                    if "doctype" in texto_respuesta.lower() or "<html" in texto_respuesta.lower():
-                        st.error("El servidor de la IA está saturado. Pulsa el botón de nuevo.")
-                    else:
-                        inicio_json = texto_respuesta.find("{")
-                        fin_json = texto_respuesta.rfind("}") + 1
-                        
-                        if inicio_json != -1 and fin_json != 0:
-                            # 1. Intentar decodificar el JSON de forma aislada
-                            datos_json = None
-                            try:
-                                datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
-                            except:
-                                st.error("Estructura de respuesta ilegible. Reintenta la captura.")
+                    inicio_json = texto_respuesta.find("{")
+                    fin_json = texto_respuesta.rfind("}") + 1
+                    
+                    if inicio_json != -1 and fin_json != 0:
+                        try:
+                            datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
                             
-                            # 2. Si el JSON es válido, mapear campos en bloque limpio plano
-                            if datos_json is not None:
-                                # Tratar la fecha de forma segura
-                                f_str = datos_json.get("fecha", "")
-                                st.session_state.fecha_detectada = datetime.date.today()
-                                if len(f_str) == 10:
-                                    try:
-                                        st.session_state.fecha_detectada = datetime.datetime.strptime(f_str, "%d/%m/%Y").date()
-                                    except:
-                                        pass
-                                
-                                if datos_json.get("tienda") in LISTA_TIENDAS:
-                                    st.session_state.tienda_detectada = datos_json.get("tienda")
-                                
-                                st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
-                                st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
-                                st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
-                                st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
-                                st.session_state.venta_entrega_detectada = convertir_a_float(datos_json.get("venta_entrega"))
-                                st.session_state.venta_llevar_detectada = convertir_a_float(datos_json.get("venta_llevar"))
-                                st.session_state.venta_ventana_detectada = convertir_a_float(datos_json.get("venta_ventana"))
-                                st.session_state.venta_come_bebe_detectada = convertir_a_float(datos_json.get("venta_come_bebe"))
-                                st.session_state.venta_visa_detectada = convertir_a_float(datos_json.get("venta_visa"))
+                            # Procesar fecha de forma aislada
+                            f_str = datos_json.get("fecha", "")
+                            st.session_state.fecha_detectada = datetime.date.today()
+                            if len(f_str) == 10:
+                                try:
+                                    st.session_state.fecha_detectada = datetime.datetime.strptime(f_str, "%d/%m/%Y").date()
+                                except:
+                                    pass
+                            
+                            if datos_json.get("tienda") in LISTA_TIENDAS:
+                                st.session_state.tienda_detectada = datos_json.get("tienda")
+                            
+                            # Inyección segura de datos en las variables de Streamlit
+                            st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
+                            st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
+                            st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
+                            st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
+                            st.session_state.venta_entrega_detectada = convertir_a_float(datos_json.get("venta_entrega"))
+                            st.session_state.venta_llevar_detectada = convertir_a_float(datos_json.get("venta_llevar"))
+                            st.session_state.venta_ventana_detectada = convertir_a_float(datos_json.get("venta_ventana"))
+                            st.session_state.venta_come_bebe_detectada = convertir_a_float(datos_json.get("venta_come_bebe"))
+                            st.session_state.venta_visa_detectada = convertir_a_float(datos_json.get("venta_visa"))
+                            st.session_state.venta_efectivo_detectada = convertir_a_float(datos_json.get("venta_efectivo"))
+                            st.session_state.venta_pluxee_detectada = convertir_a_float(datos_json.get("venta_pluxee"))
+                            st.session_state.quebranto_detectado = convertir_a_float(datos_json.get("quebranto"))
+                            st.session_state.ingreso_prosegur_detectada = convertir_a_float(datos_json.get("ingreso_prosegur"))
+                            st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
+                            st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
+                            st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
