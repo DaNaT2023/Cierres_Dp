@@ -65,17 +65,16 @@ except:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
-# CABECERA LIMPÌA CORREGIDA (ALINEACIÓN LOCAL SIMÉTRICA GARANTIZADA)
-if img_logo is not None:
-    # Creamos dos columnas muy juntas para evitar que el texto se escape a la derecha
-    col_logo, col_titulo = st.columns([0.1, 0.9])
-    with col_logo:
-        st.image(img_logo, width=65)
-    with col_titulo:
-        # Añadimos un pequeño margen superior para centrarlo milimétricamente con el logo
-        st.markdown("<h1 style='margin-top: 5px; padding: 0;'>Panel Cierre Diario Dp</h1>", unsafe_allow_html=True)
-else:
-    st.title("🍕 Panel Cierre Diario Dp")
+# CABECERA COMPACTA HTML: Logo y título juntos sin importar el tamaño del monitor
+st.markdown(
+    """
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: -10px; margin-top: -30px;">
+        <img src="https://githubusercontent.com" width="60" style="object-fit: contain;">
+        <h1 style="margin: 0; padding: 0; font-size: 2.5rem; font-weight: 700; color: #31333F; line-height: 60px;">Panel Cierre Diario Dp</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.markdown("---")
 
@@ -90,7 +89,7 @@ with pestaña_tiendas:
     turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     st.markdown("---")
     
-    # Formulario compacto de 3 columnas adaptado a pantallas de móviles
+    # Formulario compacto de 3 columnas
     col1, col2, col3 = st.columns(3)
     
     with col1:
