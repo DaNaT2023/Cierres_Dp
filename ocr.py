@@ -134,7 +134,6 @@ with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
-    # Control de acceso directo lineal
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -150,7 +149,6 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    # Cabecera una vez autenticado
     col_header, col_logout = st.columns(2)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
@@ -196,7 +194,10 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Haz doble clic sobre una celda para corregir datos, selecciona una fila y pulsa 'Suprimir' para borrarla. Al finalizar, guarda los cambios.")
+        st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
         
-        # Bloque de edición protegido dentro de un formulario síncrono
-        with st.form("contenedor_formulario_guardado"):
+        # Formato de dinero profesional
+        cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
+        config_final = {
+            "ID": st.column_config.NumberColumn(disabled=True),
+            "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
