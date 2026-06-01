@@ -221,5 +221,5 @@ with pestaña_dueño:
             st.markdown("---")
             st.subheader("📋 Histórico de Turnos")
             
-            # Forzar la carga limpia de la tabla para que no se oculte en Streamlit
+            # PARÉNTESIS CERRADO CORRECTAMENTE EN ESTA SECCIÓN DEFINITIVA
             st.dataframe(
