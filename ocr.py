@@ -204,8 +204,9 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
+                    st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-       st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
+     st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
             
             cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
             configuracion_columnas = {
