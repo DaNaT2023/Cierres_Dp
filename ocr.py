@@ -119,7 +119,6 @@ with pestaña_tiendas:
                     bytes_imagen = imagen_subida.read()
                     imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
                     
-                    # Conexión con Together AI usando OpenAI SDK compatible
                     client = OpenAI(
                         base_url="https://together.xyz",
                         api_key=st.secrets["TOGETHER_API_KEY"]
@@ -178,10 +177,9 @@ with pestaña_tiendas:
                     texto_limpio = response.choices.message.content.replace("```json", "").replace("```", "").strip()
                     datos = json.loads(texto_limpio)
                     
-                    # Mapear datos a variables de sesión de Streamlit
                     try:
                         st.session_state.fecha_detectada = datetime.datetime.strptime(datos.get("fecha", ""), "%d/%m/%Y").date()
-                    except Exception as e:
+                    except Exception as e_fecha:
                         st.session_state.fecha_detectada = datetime.date.today()
                         
                     if datos.get("tienda") in LISTA_TIENDAS:
@@ -210,3 +208,6 @@ with pestaña_tiendas:
                     st.rerun()
                     
                 except Exception as e:
+                    st.error(f"Error al conectar con el motor de Together AI: {e}. Puedes rellenar los datos manualmente abajo.")
+
+    st.markdown("---")
