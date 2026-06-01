@@ -65,16 +65,17 @@ except:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
-# CABECERA CORREGIDA: Alineación simétrica perfecta y en la misma línea
-st.markdown(
-    """
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 5px;">
-        <img src="https://githubusercontent.com" width="55" style="display: block;">
-        <h1 style="margin: 0; padding: 0; font-size: 2.3rem; font-weight: 700; color: #31333F;">Panel Cierre Diario Dp</h1>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# CABECERA LIMPÌA CORREGIDA (ALINEACIÓN LOCAL SIMÉTRICA GARANTIZADA)
+if img_logo is not None:
+    # Creamos dos columnas muy juntas para evitar que el texto se escape a la derecha
+    col_logo, col_titulo = st.columns([0.1, 0.9])
+    with col_logo:
+        st.image(img_logo, width=65)
+    with col_titulo:
+        # Añadimos un pequeño margen superior para centrarlo milimétricamente con el logo
+        st.markdown("<h1 style='margin-top: 5px; padding: 0;'>Panel Cierre Diario Dp</h1>", unsafe_allow_html=True)
+else:
+    st.title("🍕 Panel Cierre Diario Dp")
 
 st.markdown("---")
 
