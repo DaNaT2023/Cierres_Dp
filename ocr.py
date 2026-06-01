@@ -18,6 +18,10 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
+# Inicializar de forma segura la variable de autenticación en la sesión
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
 # ==========================================
 # 1. BASE DE DATOS LOCAL COMPLETA
 # ==========================================
@@ -101,7 +105,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (MANTENIDO INTACTO)
+# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO MANUAL)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -161,7 +165,7 @@ with pestaña_tiendas:
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
         if encargado.strip() == "":
-            st.error("Por favor, introduce el nombre del encargado.")
+            st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
         else:
             alerta = "OK"
             if quebranto <= -100:
@@ -193,20 +197,13 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (IDEA 3 IMPLEMENTADA)
+# SECCIÓN: PANEL DEL PROPIETARIO (LÓGICA MEJORADA DE ACCESO)
 # ------------------------------------------
 with pestaña_dueño:
-    if "autenticado" not in st.session_state:
-        st.session_state.autenticado = False
-
+    # Si NO está autenticado, muestra estrictamente el formulario de contraseña
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido")
         input_usuario = st.text_input("Usuario", key="login_user_propietario")
         input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
         
         if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
-            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
