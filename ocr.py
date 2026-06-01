@@ -181,34 +181,41 @@ with pestaña_dueño:
 
     df_vista = st.session_state.df_original
 
-    # NUEVO CONTROL SEGURO: Si la base de datos se borró por completo tras un reinicio de la nube
+    # RESTAURACIÓN REPARADA: Lee el .xls nativo como HTML sin usar openpyxl
     if df_vista.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
         st.markdown("### 🔄 Restaurar Copia de Seguridad")
-        st.caption("Si la aplicación sufrió un reseteo, sube aquí tu último archivo .xls o .xlsx guardado para recuperar el historial de inmediato:")
+        st.caption("Sube aquí tu archivo .xls descargado previamente para recuperar todo el historial:")
         
-        archivo_subido = st.file_uploader("Selecciona el archivo de copia de seguridad:", type=["xls", "xlsx"], key="recuperacion_vacia_dueño")
+        archivo_subido = st.file_uploader("Selecciona el archivo de copia de seguridad:", type=["xls"], key="recuperacion_vacia_dueño")
         if archivo_subido is not None:
             try:
-                # Leemos el archivo restaurado interpretando las tablas HTML universales o nativas
-                df_recuperado = pd.read_html(archivo_subido)[0] if archivo_subido.name.endswith('.xls') else pd.read_excel(archivo_subido)
+                # Al ser un .xls creado por nosotros, se lee de forma directa y ultra-rápida como HTML plano
+                listas_df = pd.read_html(archivo_subido)
+                df_recuperado = listas_df[0]
                 
-                # Mapeamos a la inversa las columnas al español para inyectar en SQLite
                 mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
                 df_recuperado_bd = df_recuperado.rename(columns=mapeo_inverso_bd)
                 
+                # Nos aseguramos de que el orden de columnas sea idéntico
+                columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'estado_alerta']
+                for col in columnas_db:
+                    if col not in df_recuperado_bd.columns:
+                        df_recuperado_bd[col] = 0.0
+                
+                df_recuperado_bd = df_recuperado_bd[[c for c in columnas_db if c in df_recuperado_bd.columns]]
+                
                 conn = sqlite3.connect("tiendas.db")
-                # Insertamos todo de golpe reescribiendo la tabla local vacía
                 df_recuperado_bd.to_sql("recuadros", conn, if_exists="append", index=False)
                 conn.close()
                 
-                st.success("¡Historial completo restaurado con éxito de forma inmediata!")
+                st.success("¡Historial completo restaurado con éxito!")
                 if "df_original" in st.session_state:
                     del st.session_state.df_original
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al procesar la copia de seguridad: {e}. Asegúrate de subir el archivo correcto.")
+                st.error(f"Error al procesar la copia de seguridad: {e}")
     else:
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -221,12 +228,10 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        # Generar archivo de descarga universal afinado con UTF-8
         html_crudo = df_vista.to_html(index=False)
         html_perfecto = f"<meta charset='utf-8'>\n{html_crudo}"
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
-        # Formateo visual arriba: 3 métricas, 1 botón de descarga y 1 caja de restauración rápida
         col_m1, col_m2, col_m3, col_btn_descarga = st.columns(4)
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
@@ -244,18 +249,19 @@ with pestaña_dueño:
                 key="btn_descarga_seguridad_propietario"
             )
             
-        # ZONA DE IMPORTACIÓN DIRECTA CUANDO LA TABLA SÍ CONTIENE DATOS
         st.markdown(" ")
-        with st.expander("🔄 Importar / Añadir cierres desde un archivo Excel externo"):
-            archivo_añadir = st.file_uploader("Sube tu archivo .xls o .xlsx para añadir turnos acumulados:", type=["xls", "xlsx"], key="recuperacion_activa_dueño")
+        with st.expander("🔄 Importar / Añadir cierres desde un archivo copia externa"):
+            # REPARADO: Solo acepta archivos .xls generados por el propio botón de descarga
+            archivo_añadir = st.file_uploader("Sube tu archivo .xls de copia de seguridad:", type=["xls"], key="recuperacion_activa_dueño")
             if archivo_añadir is not None:
                 if st.button("⚡ Confirmar inserción masiva de datos", use_container_width=True, type="secondary"):
                     try:
-                        df_extraido = pd.read_html(archivo_añadir)[0] if archivo_añadir.name.endswith('.xls') else pd.read_excel(archivo_añadir)
+                        listas_df = pd.read_html(archivo_añadir)
+                        df_extraido = listas_df[0]
+                        
                         mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
                         df_extraido_bd = df_extraido.rename(columns=mapeo_inverso_bd)
                         
-                        # Si en el excel vienen columnas viejas como el ID autonumérico, lo eliminamos para evitar duplicados
                         if "id" in df_extraido_bd.columns:
                             df_extraido_bd = df_extraido_bd.drop(columns=["id"])
                             
@@ -263,7 +269,7 @@ with pestaña_dueño:
                         df_extraido_bd.to_sql("recuadros", conn, if_exists="append", index=False)
                         conn.close()
                         
-                        st.success("¡Datos inyectados y consolidados correctamente en la tabla!")
+                        st.success("¡Datos inyectados y consolidados correctamente!")
                         if "df_original" in st.session_state:
                             del st.session_state.df_original
                         time.sleep(1)
