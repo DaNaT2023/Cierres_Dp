@@ -185,28 +185,28 @@ with pestaña_tiendas:
             ))
             conn.commit()
             conn.close()
-            
             st.success("¡El cierre de turno se ha guardado correctamente!")
             time.sleep(1)
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA LINEAL PLANA ANTIFALLOS)
+# SECCIÓN: PANEL DEL PROPIETARIO (CÓDIGO 100% PLANO SIN MAPAS DE INDENTACIÓN)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
+    clave_ingresada = st.text_input("Introduce la contraseña de acceso para el propietario:", type="password", key="pass_propietario_plana")
     
-    # Comprobación mediante caja de texto directa
-    clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
+    if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
+        if clave_ingresada != "":
+            st.error("⚠️ La contraseña introducida no es correcta.")
+        st.warning("Introduce las credenciales arriba para ver el histórico de cierres.")
+        st.stop()
+
+    st.success("🔓 Acceso concedido correctamente.")
+    st.markdown("---")
     
-    if clave_ingresada == st.secrets["ADMIN_PASSWORD"]:
-        st.markdown("---")
-        st.success("🔓 Acceso concedido de forma correcta.")
-        
-        conn = sqlite3.connect("pizzerias_final.db")
-        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-        conn.close()
-        
-        if df.empty:
-            st.info("Aún no se han registrado cierres en la base de datos de control. Rellena el primero desde la pestaña de envío.")
-        else:
+    conn = sqlite3.connect("pizzerias_final.db")
+    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    conn.close()
+    
+    if df.empty:
