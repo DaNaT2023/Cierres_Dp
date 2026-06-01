@@ -121,7 +121,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Vía Directa)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Conexión Directa)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -134,8 +134,10 @@ with pestaña_tiendas:
                     
                     url = "https://together.xyz"
                     
+                    # ENVIAR CABECERAS LIMPIAS AL SERVIDOR DE TOGETHER AI
+                    api_key_limpia = str(st.secrets["TOGETHER_API_KEY"]).strip()
                     headers = {
-                        "Authorization": "Bearer " + str(st.secrets["TOGETHER_API_KEY"]),
+                        "Authorization": f"Bearer {api_key_limpia}",
                         "Content-Type": "application/json"
                     }
                     
@@ -146,7 +148,7 @@ with pestaña_tiendas:
                                 "role": "user",
                                 "content": [
                                     {"type": "text", "text": prompt_ocr},
-                                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + str(imagen_base64)}}
+                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{imagen_base64}"}}
                                 ]
                             }
                         ],
@@ -159,14 +161,14 @@ with pestaña_tiendas:
                         resultado_json = response.json()
                         texto_respuesta = resultado_json['choices']['message']['content'].strip()
                     else:
-                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Verifica tus secretos.")
+                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Verifica los secretos de la app.")
                         error_detectado = True
                         
                 except Exception as api_err:
                     st.error(f"Error de red: {api_err}")
                     error_detectado = True
 
-                # PROCESAMIENTO TOTALMENTE LINEAL SIN BLOQUES TRY ANIDADOS INTERNOS
+                # PROCESAMIENTO LINEAL
                 if not error_detectado and texto_respuesta:
                     inicio_json = texto_respuesta.find("{")
                     fin_json = texto_respuesta.rfind("}") + 1
@@ -206,4 +208,3 @@ with pestaña_tiendas:
                             st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
                             st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
                             st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
-                            st.session_state.glovo_detectada = convertir_a_float(datos_json.get("glovo"))
