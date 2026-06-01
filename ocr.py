@@ -193,19 +193,23 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (LINEAL PLANO OPERATIVO)
 # ------------------------------------------
 with pestaña_dueño:
-    if "autenticado" not in st.session_state:
-        st.session_state.autenticado = False
-
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido")
-        input_usuario = st.text_input("Usuario", key="login_user_propietario")
-        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
+    st.subheader("📊 Resumen General de Cierres")
+    
+    conn = sqlite3.connect("tiendas.db")
+    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    conn.close()
+    
+    if df.empty:
+        st.info("Aún no se han registrado cierres en la base de datos.")
+    else:
+        tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+        if not tiendas_filtro:
+            tiendas_filtro = LISTA_TIENDAS
+            
+        df_filtrado = df[df['tienda'].isin(tiendas_filtro)].copy()
         
-        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
-            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.success("¡Acceso concedido!")
-                st.rerun()
+        st.markdown("### 📈 Métricas")
+        m1, m2, m3 = st.columns(3)
