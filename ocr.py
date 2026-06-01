@@ -137,7 +137,7 @@ with pestaña_tiendas:
                     response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=[img, prompt_ocr],
-                        config={"response_mime_type": "application/json"} # Fuerza formato JSON nativo
+                        config={"response_mime_type": "application/json"}
                     )
                     texto_respuesta = response.text.strip()
                         
@@ -166,10 +166,14 @@ with pestaña_tiendas:
                                 except:
                                     pass
                             
-                            if datos_json.get("tienda") in LISTA_TIENDAS:
-                                st.session_state.tienda_detectada = datos_json.get("tienda")
+                            # Validar que la tienda coincida
+                            tienda_ia = datos_json.get("tienda", "")
+                            for t in LISTA_TIENDAS:
+                                if t.lower() in tienda_ia.lower():
+                                    st.session_state.tienda_detectada = t
                             
                             st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
+                            st.session_state.bytes_imagen = None
                             st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
                             st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
                             st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
@@ -191,7 +195,7 @@ with pestaña_tiendas:
                             st.success("¡Datos del recuadro cargados con éxito!")
                             st.rerun()
                     else:
-                        st.error("La respuesta de la IA no contiene un formato de tabla válido.")
+                        st.error("La IA no contiene un formato de tabla válido.")
 
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
@@ -200,7 +204,3 @@ with pestaña_tiendas:
     if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
         
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
