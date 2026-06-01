@@ -91,7 +91,6 @@ with pestaña_tiendas:
             if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
             
-            # Preparar la nueva fila con los nombres exactos de las columnas de tu Excel
             nueva_fila = pd.DataFrame([{
                 "Fecha": fecha.strftime("%Y-%m-%d"), "Tienda": tienda, "Turno": turno_seleccionado, "Encargado": encargado,
                 "Venta Neta": venta_neta, "Venta Total": venta, "Venta 2025": venta_2025,
@@ -102,7 +101,6 @@ with pestaña_tiendas:
             }])
             
             try:
-                # Leer los datos que ya existen en el Sheets, añadir la nueva fila y actualizarlo todo
                 datos_actuales = conn_sheets.read(ttl=0)
                 datos_actualizados = pd.concat([datos_actuales, nueva_fila], ignore_index=True)
                 conn_sheets.update(data=datos_actualizados)
@@ -111,7 +109,7 @@ with pestaña_tiendas:
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al guardar en Google Sheets: {e}. Comprueba que has dado permisos de 'Editor'.")
+                st.error(f"Error al guardar en Google Sheets: {e}")
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -135,7 +133,6 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    # Panel del Propietario Autenticado leyendo en tiempo real de Google Sheets
     col_header, col_logout = st.columns(2)
     with col_header:
         st.subheader("📊 Resumen General de Cierres (Google Sheets)")
@@ -145,7 +142,6 @@ with pestaña_dueño:
             st.rerun()
     
     try:
-        # Extraer los datos guardados en el Excel de Google en vivo
         df = conn_sheets.read(ttl=0)
     except Exception as e:
         st.error(f"No se pudo leer la hoja de cálculo: {e}")
@@ -161,10 +157,8 @@ with pestaña_dueño:
             alertas_disponibles = list(df['Estado'].unique()) if 'Estado' in df.columns else ["OK"]
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
-        # Filtrado en base a lo que el propietario elija en pantalla
         df_filtrado = df[df['Tienda'].isin(tiendas_filtro) & df['Estado'].isin(alertas_filtro)].copy()
         
-        # Columnas esenciales que el dueño quiere ver
         columnas_visibles = ['Fecha', 'Tienda', 'Turno', 'Encargado', 'Venta Neta', 'Venta Total', 'Venta 2025', 'Venta Visa', 'Venta Efectivo', 'Venta Pluxee Gourmet', 'Quebranto', 'Ingreso Prosegur', 'Estado']
         df_vista = df_filtrado[[c for c in columnas_visibles if c in df_filtrado.columns]]
         
@@ -178,14 +172,21 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
-        st.subheader("📝 Tabla Histórica de Cierres (Doble clic para editar en tu Google Sheets)")
+        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
+        st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
         
-        # Editor interactivo que modifica las celdas directamente de tu Google Sheets
-        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        # Formato de dinero profesional
+        cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
+        config_final = {
+            "Venta Neta": cfg_dinero, "Venta Total": cfg_dinero, "Venta 2025": cfg_dinero,
+            "Venta Visa": cfg_dinero, "Venta Efectivo": cfg_dinero, "Venta Pluxee Gourmet": cfg_dinero,
+            "Quebranto": cfg_dinero, "Ingreso Prosegur": cfg_dinero,
+            "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
+            "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
+        }
         
-        if st.button("💾 Guardar Cambios Directo en Google Sheets", type="primary", use_container_width=True):
-            estado_editor = st.session_state["editor_propietario"]
+        formulario_dueño = st.form("form_edicion_limpio")
+        tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", column_config=config_final, key="editor_propietario")
+        ejecutar_guardado = formulario_dueño.form_submit_button("💾 Guardar Cambios en Google Sheets", use_container_width=True, type="primary")
             
-            # 1. Procesar filas eliminadas directamente en el dataframe global
-            filas_borradas = estado_editor.get("deleted_rows", [])
-            if filas_borradas:
+        if ejecutar_guardado:
