@@ -198,6 +198,8 @@ with pestaña_dueño:
         st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
         
         cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
+        
+        # DEFINICIÓN ARREGLADA Y PERFECTAMENTE CERRADA DEL DICCIONARIO
         configuracion_columnas = {
             "ID": st.column_config.NumberColumn(disabled=True),
-            "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
+            "Venta Neta": cfg_dinero, 
