@@ -185,6 +185,7 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         col_m1, col_m2, col_m3 = st.columns(3)
+        
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
         with col_m2:
@@ -196,7 +197,7 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
         
-        # Formato de dinero profesional para las columnas numéricas
         cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
         configuracion_columnas = {
             "ID": st.column_config.NumberColumn(disabled=True),
+            "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
