@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import time
 import base64
+import io
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
@@ -152,7 +153,6 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    # Cabecera superior con 2 columnas (Título y Salir)
     col_header, col_logout = st.columns(2)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
@@ -193,14 +193,16 @@ with pestaña_dueño:
         
         df_filtrado = df_vista[df_vista['Tienda'].isin(tiendas_filtro) & df_vista['Estado'].isin(alertas_filtro)].copy()
         
-        # MÉTRICAS Y BOTÓN DE SEGURIDAD ARRIBA DEL TODO
         st.markdown("### 📈 Métricas del Grupo")
         
-        # Preparamos los datos completos de la base de datos para la descarga de seguridad
-        csv_seguridad = df_vista.to_csv(index=False, sep=";").encode('utf-8-sig')
+        # PROCESADOR DE EXPORTACIÓN EXCEL (.XLSX) NATIVO EN MEMORIA
+        buffer_excel = io.BytesIO()
+        with pd.ExcelWriter(buffer_excel, engine='openpyxl') as escritor:
+            df_vista.to_excel(escritor, index=False, sheet_name='Historial Cierres')
+        excel_descarga = buffer_excel.getvalue()
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
-        col_m1, col_m2, col_m3, col_btn_descarga = st.columns([2, 2, 2, 3])
+        col_m1, col_m2, col_m3, col_btn_descarga = st.columns()
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
         with col_m2:
@@ -208,12 +210,12 @@ with pestaña_dueño:
         with col_m3:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         with col_btn_descarga:
-            # Botón inteligente de descarga para copia de seguridad instantánea
+            # Botón inteligente de descarga para copia de seguridad instantánea en formato XLSX
             st.download_button(
-                label="📥 Descargar copia seguridad (Excel/CSV)",
-                data=csv_seguridad,
-                file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.csv",
-                mime="text/csv",
+                label="📥 Descargar copia seguridad (.xlsx)",
+                data=excel_descarga,
+                file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
                 key="btn_descarga_seguridad_propietario"
             )
