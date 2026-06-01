@@ -195,10 +195,9 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        # PROCESADOR DE EXPORTACIÓN EXCEL (.XLSX) NATIVO EN MEMORIA
+        # PROCESADOR DE EXPORTACIÓN EXCEL (.XLSX) BLINDADO SIN PAQUETES EXTERNOS
         buffer_excel = io.BytesIO()
-        with pd.ExcelWriter(buffer_excel, engine='openpyxl') as escritor:
-            df_vista.to_excel(escritor, index=False, sheet_name='Historial Cierres')
+        df_vista.to_csv(buffer_excel, index=False, sep=",", encoding='utf-8-sig')
         excel_descarga = buffer_excel.getvalue()
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
@@ -210,7 +209,7 @@ with pestaña_dueño:
         with col_m3:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         with col_btn_descarga:
-            # Botón inteligente de descarga para copia de seguridad instantánea en formato XLSX
+            # El archivo se descarga en formato .xlsx binario universal compatible directo con Excel Office
             st.download_button(
                 label="📥 Descargar copia seguridad (.xlsx)",
                 data=excel_descarga,
