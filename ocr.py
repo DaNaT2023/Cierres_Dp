@@ -168,6 +168,7 @@ with pestaña_dueño:
         with col_f1:
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
         with col_f2:
+            # MEJORA: El filtro ahora selecciona por defecto TODOS los estados para que nunca salga la tabla en blanco
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
@@ -193,10 +194,7 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
-        
-        # UBICACIÓN NUEVA: El botón de guardar se pinta arriba de la tabla para que esté siempre visible
-        ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cambios_propietario")
-        
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla y pulsa el botón azul de ARRIBA al terminar para recalcular el Estado.")
+        st.caption("💡 Modifica las celdas directamente en la tabla. Al terminar, pulsa el botón de abajo del todo para confirmar los cambios.")
         
+        # CORRECCIÓN DE REPOSITORIO VISUAL: La tabla vuelve a renderizarse arriba libre de errores
