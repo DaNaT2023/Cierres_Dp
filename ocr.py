@@ -3,9 +3,9 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-import requests
 import base64
 import json
+from google import genai
 from PIL import Image
 
 # ==========================================
@@ -121,51 +121,31 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Google Gemini (Estable y Gratis)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Google Gemini (SDK Oficial)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
                 try:
-                    imagen_subida.seek(0)
-                    bytes_imagen = imagen_subida.read()
-                    imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
+                    img = Image.open(imagen_subida)
                     
-                    prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, sin bloques markdown ni explicaciones, usando exactamente estas llaves: fecha, tienda, encargado, venta_neta, venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa, venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat"
+                    # Conectar usando el cliente SDK oficial de Google
+                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
-                    url = "https://googleapis.com"
+                    prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, usando exactamente estas llaves: fecha, tienda, encargado, venta_neta, venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa, venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat"
                     
-                    payload = {
-                        "contents": [{
-                            "parts": [
-                                {"text": prompt_ocr},
-                                {
-                                    "inlineData": {
-                                        "mimeType": "image/jpeg",
-                                        "data": imagen_base64
-                                    }
-                                }
-                            ]
-                        }],
-                        "generationConfig": {
-                            "responseMimeType": "application/json"
-                        }
-                    }
-                    
-                    # Conexión directa utilizando pasarela segura libre de Google
-                    response = requests.post(url, json=payload, params={"key": "AIzaSyAs" + "D4vD0V" + "m0Ew9X1" + "z6pLN9" + "w18r6" + "qS_qL6w"})
-                    
-                    if response.status_code == 200:
-                        resultado_json = response.json()
-                        texto_respuesta = resultado_json['candidates'][0]['content']['parts'][0]['text'].strip()
-                    else:
-                        st.error(f"Error temporal de comunicación con el motor (Código {response.status_code}). Vuelve a pulsar el botón en unos segundos.")
-                        error_detectado = True
+                    # Llamada limpia al modelo oficial de visión
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=[img, prompt_ocr],
+                        config={"response_mime_type": "application/json"} # Fuerza formato JSON nativo
+                    )
+                    texto_respuesta = response.text.strip()
                         
                 except Exception as api_err:
-                    st.error(f"Error de red: {api_err}")
+                    st.error(f"Error con el motor oficial de Gemini: {api_err}. Revisa tu clave en Secrets.")
                     error_detectado = True
 
-                # PROCESAMIENTO LINEAL
+                # PROCESAMIENTO LINEAL PROTEGIDO
                 if not error_detectado and texto_respuesta:
                     inicio_json = texto_respuesta.find("{")
                     fin_json = texto_respuesta.rfind("}") + 1
@@ -203,3 +183,24 @@ with pestaña_tiendas:
                             st.session_state.quebranto_detectado = convertir_a_float(datos_json.get("quebranto"))
                             st.session_state.ingreso_prosegur_detectada = convertir_a_float(datos_json.get("ingreso_prosegur"))
                             st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
+                            st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
+                            st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
+                            st.session_state.glovo_detectada = convertir_a_float(datos_json.get("glovo"))
+                            st.session_state.just_eat_detectada = convertir_a_float(datos_json.get("just_eat"))
+                            
+                            st.success("¡Datos del recuadro cargados con éxito!")
+                            st.rerun()
+                    else:
+                        st.error("La respuesta de la IA no contiene un formato de tabla válido.")
+
+    st.markdown("---")
+    st.subheader("📝 Confirmar Datos del Formulario")
+    
+    tienda_idx = 0
+    if st.session_state.tienda_detectada in LISTA_TIENDAS:
+        tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
+        
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
