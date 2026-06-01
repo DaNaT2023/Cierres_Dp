@@ -124,6 +124,11 @@ with pestaña_tiendas:
             conn.commit()
             conn.close()
             st.success("¡El cierre se ha guardado correctamente!")
+            
+            # Forzamos que el Panel de Control refresque sus datos al recibir un nuevo turno
+            if "df_original" in st.session_state:
+                del st.session_state.df_original
+                
             time.sleep(1)
             st.rerun()
 
@@ -155,23 +160,15 @@ with pestaña_dueño:
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
+            if "df_original" in st.session_state:
+                del st.session_state.df_original
             st.rerun()
-    
-    conn = sqlite3.connect("tiendas.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
-    
-    if df.empty:
-        st.info("Aún no se han registrado cierres en la base de datos.")
-    else:
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-        with col_f2:
-            alertas_disponibles = list(df['estado_alerta'].unique())
-            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
-        
-        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+
+    # IMPLEMENTACIÓN FIJA SEGÚN TU CAPTURA: Guardar el DataFrame original en session_state para comparar
+    if "df_original" not in st.session_state:
+        conn = sqlite3.connect("tiendas.db")
+        df_base = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
         
         columnas_mapeo = {
             'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
@@ -180,26 +177,29 @@ with pestaña_dueño:
             'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
         }
         
-        mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
-        df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
+        if not df_base.empty:
+            df_base = df_base[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
+        st.session_state.df_original = df_base
+
+    df_vista = st.session_state.df_original
+
+    if df_vista.empty:
+        st.info("Aún no se han registrado cierres en la base de datos.")
+    else:
+        # Filtros visuales superiores
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+        with col_f2:
+            alertas_disponibles = list(df_vista['Estado'].unique())
+            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
+        df_filtrado = df_vista[df_vista['Tienda'].isin(tiendas_filtro) & df_vista['Estado'].isin(alertas_filtro)].copy()
+        
+        # Métricas Dinámicas superiores
         st.markdown("### 📈 Métricas del Grupo")
         col_m1, col_m2, col_m3 = st.columns(3)
-        
         with col_m1:
-            st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
         with col_m2:
-            st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
-        with col_m3:
-            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
-        
-        st.markdown("---")
-        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
-        
-        cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
-        
-        # DEFINICIÓN ARREGLADA Y PERFECTAMENTE CERRADA DEL DICCIONARIO
-        configuracion_columnas = {
-            "ID": st.column_config.NumberColumn(disabled=True),
-            "Venta Neta": cfg_dinero, 
+            st.metric("Balance de Quebrantos", f"{df_filtrado['Quebranto'].sum():,.2f} €")
