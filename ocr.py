@@ -1,4 +1,4 @@
-import streamlit st
+import streamlit as st
 import sqlite3
 import pandas as pd
 import datetime
@@ -332,7 +332,7 @@ with pestaña_dueño:
             "Tarjeta": cfg_dinero, "Efectivo": cfg_dinero, "Pluxee": cfg_dinero,
             "Quebranto": cfg_dinero, "Prosegur": cfg_dinero, 
             "Encargado OBS": st.column_config.TextColumn(disabled=True),
-            "Observaciones": st.column_config.TextColumn(disabled=not es_nataly), # Control estricto de edición
+            "Observaciones": st.column_config.TextColumn(disabled=not es_nataly),
             "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS, disabled=not es_nataly),
             "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"], disabled=not es_nataly),
             "Fecha": st.column_config.TextColumn(disabled=not es_nataly),
@@ -346,7 +346,7 @@ with pestaña_dueño:
             hide_index=True,
             num_rows="dynamic" if es_nataly else "fixed",
             column_config=configuracion_columnas,
-            disabled=not es_nataly, # Bloquea la interacción a Celia y Diana de forma íntegra
+            disabled=not es_nataly,
             key="editor_propietario_definitivo"
         )
 
