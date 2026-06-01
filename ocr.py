@@ -121,7 +121,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Llama Visión Avanzada)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Conexión Directa)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -130,45 +130,13 @@ with pestaña_tiendas:
                     bytes_imagen = imagen_subida.read()
                     imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
                     
-                    # Prompt ultra detallado estructurado para mapear las 3 columnas y valores unificados
-                    prompt_ocr = f"""
-                    Analiza la imagen de la tabla de caja diaria. Extrae los datos financieros específicamente para el turno de la: **{turno_seleccionado}**.
-                    
-                    Instrucciones de extracción por columnas:
-                    1. Localiza las columnas 'Turno Mañana' y 'Turno Noche'. Extrae los números de la columna que coincida con el turno solicitado ({turno_seleccionado}).
-                    2. Si una etiqueta tiene su cantidad unificada o centrada en una celda compartida para todo el día (como suele pasar con las plataformas Web, TGTG, Uber Eats, Glovo, Just Eat y a veces Venta Total), toma ese valor único sin importar el turno seleccionado.
-                    3. Devuelve los datos estrictamente en este formato JSON puro, sin bloques markdown, sin texto explicativo:
-                    {{
-                        "fecha": "DD/MM/AAAA",
-                        "tienda": "Nombre de la tienda si aparece",
-                        "encargado": "Nombre del encargado de este turno",
-                        "venta_neta": número,
-                        "venta_total": número,
-                        "venta_2025": número,
-                        "venta_entrega": número,
-                        "venta_llevar": número,
-                        "venta_ventana": número,
-                        "venta_come_bebe": número,
-                        "venta_visa": número,
-                        "venta_efectivo": número,
-                        "venta_pluxee": número,
-                        "quebranto": número,
-                        "ingreso_prosegur": número,
-                        "web": número,
-                        "tgtg": número,
-                        "uber_eats": número,
-                        "glovo": número,
-                        "just_eat": número
-                    }}
-                    """
+                    prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, sin bloques markdown ni explicaciones, usando exactamente estas llaves: fecha, tienda, encargado, venta_neta, venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa, venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat"
                     
                     url = "https://together.xyz"
-                    
-                    # Tu clave limpia fija inyectada directamente en código de forma segura
                     api_key_fija = "tgp_v1_6xomcp2r7wdNWUv32dUu5UGf1_og47bcFUmZcZs_QQU"
                     
                     headers = {
-                        "Authorization": f"Bearer {api_key_fija}",
+                        "Authorization": "Bearer " + str(api_key_fija),
                         "Content-Type": "application/json"
                     }
                     
@@ -179,7 +147,7 @@ with pestaña_tiendas:
                                 "role": "user",
                                 "content": [
                                     {"type": "text", "text": prompt_ocr},
-                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{imagen_base64}"}}
+                                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + str(imagen_base64)}}
                                 ]
                             }
                         ],
@@ -192,14 +160,14 @@ with pestaña_tiendas:
                         resultado_json = response.json()
                         texto_respuesta = resultado_json['choices']['message']['content'].strip()
                     else:
-                        st.error(f"Error de comunicación con el servidor (Código {response.status_code}). Comprueba tu panel de Together AI.")
+                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Verifica tu saldo.")
                         error_detectado = True
                         
                 except Exception as api_err:
-                    st.error(f"Error en la llamada de red: {api_err}")
+                    st.error(f"Error de red: {api_err}")
                     error_detectado = True
 
-                # PROCESAMIENTO LINEAL PROTEGIDO
+                # PROCESAMIENTO LINEAL
                 if not error_detectado and texto_respuesta:
                     inicio_json = texto_respuesta.find("{")
                     fin_json = texto_respuesta.rfind("}") + 1
@@ -209,7 +177,7 @@ with pestaña_tiendas:
                         try:
                             datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
                         except:
-                            st.error("No se pudo descifrar el formato de la respuesta.")
+                            st.error("No se pudo estructurar el contenido como JSON.")
                         
                         if datos_json is not None:
                             f_str = datos_json.get("fecha", "")
@@ -225,118 +193,15 @@ with pestaña_tiendas:
                             
                             st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
                             st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
-            venta_come_bebe REAL,
-            venta_visa REAL,
-            venta_efectivo REAL,
-            venta_pluxee REAL,
-            quebranto REAL,
-            ingreso_prosegur REAL,
-            web REAL,
-            tgtg REAL,
-            uber_eats REAL,
-            glovo REAL,
-            just_eat REAL,
-            estado_alerta TEXT
-        )
-    """)
-    conexion.commit()
-    conexion.close()
-
-inicializar_bd()
-
-# ==========================================
-# 2. INTERFAZ WEB CON STREAMLIT
-# ==========================================
-st.set_page_config(page_title="Panel Cierre Diario Dp 🍕", layout="wide")
-
-st.title("🍕 Panel Cierre Diario Dp")
-st.markdown("---")
-
-pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
-
-# ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS
-# ------------------------------------------
-with pestaña_tiendas:
-    st.header("Formulario de Cierre de Turno")
-    
-    col_pre1, col_pre2 = st.columns(2)
-    with col_pre1:
-        turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
-    
-    st.subheader("📸 Subir Recuadro Diario desde el Móvil")
-    imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
-    
-    if imagen_subida is not None:
-        st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
-        
-        if st.button("🔍 Extraer Palabras del Recuadro", key="btn_ejecutar_ocr_ia"):
-            with st.spinner("Analizando y emparejando etiquetas del recuadro..."):
-                try:
-                    # Usamos la librería OCR nativa que procesa el texto en el servidor de Streamlit
-                    import pytesseract
-                    img = Image.open(imagen_subida)
-                    texto_extraido = pytesseract.image_to_string(img)
-                    
-                    # Limpieza lineal del texto extraído por palabras
-                    lineas = [linea.strip() for linea in texto_extraido.split("\n") if linea.strip()]
-                    texto_unificado = "\n".join(lineas)
-                    
-                    # Mapear los datos palabra por palabra de forma ultra-segura
-                    st.session_state.venta_neta_detectada = buscar_cifra(texto_unificado, "venta neta")
-                    st.session_state.venta_detectada = buscar_cifra(texto_unificado, "venta total")
-                    st.session_state.venta_2025_detectada = buscar_cifra(texto_unificado, "venta 2025")
-                    st.session_state.venta_entrega_detectada = buscar_cifra(texto_unificado, "venta entrega")
-                    st.session_state.venta_llevar_detectada = buscar_cifra(texto_unificado, "venta llevar")
-                    st.session_state.venta_ventana_detectada = buscar_cifra(texto_unificado, "venta ventana")
-                    st.session_state.venta_come_bebe_detectada = buscar_cifra(texto_unificado, "come & bebe")
-                    st.session_state.venta_visa_detectada = buscar_cifra(texto_unificado, "venta visa")
-                    st.session_state.venta_efectivo_detectada = buscar_cifra(texto_unificado, "venta en efectivo")
-                    st.session_state.venta_pluxee_detectada = buscar_cifra(texto_unificado, "pluxee gourmet")
-                    st.session_state.quebranto_detectado = buscar_cifra(texto_unificado, "quebranto")
-                    st.session_state.ingreso_prosegur_detectada = buscar_cifra(texto_unificado, "ingreso prosegur")
-                    st.session_state.web_detectada = buscar_cifra(texto_unificado, "web")
-                    st.session_state.tgtg_detectada = buscar_cifra(texto_unificado, "tgtg")
-                    st.session_state.uber_eats_detectada = buscar_cifra(texto_unificado, "uber eats")
-                    st.session_state.glovo_detectada = buscar_cifra(texto_unificado, "glovo")
-                    st.session_state.just_eat_detectada = buscar_cifra(texto_unificado, "just eat")
-                    
-                    # Intentar buscar el encargado de forma genérica
-                    for linea in lineas:
-                        if "encargado" in linea.lower():
-                            st.session_state.encargado_detectado = linea.lower().replace("encargado", "").replace(":", "").strip().capitalize()
-                    
-                    st.success("¡Palabras procesadas! Verifica los datos abajo.")
-                    st.rerun()
-                except Exception as e_ocr:
-                    st.error(f"Falta configurar el motor gráfico en el servidor: {e_ocr}. Introduce los datos manualmente abajo.")
-
-    st.markdown("---")
-    st.subheader("📝 Confirmar Datos del Formulario")
-    
-    tienda_idx = 0
-    if st.session_state.tienda_detectada in LISTA_TIENDAS:
-        tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
-        
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
-        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
-        fecha = st.date_input("Fecha del Recuadro", value=st.session_state.fecha_detectada, key="input_fecha_formulario")
-        venta_neta = st.number_input("Venta Neta (€)", value=st.session_state.venta_neta_detectada, step=10.0, key="input_vn_formulario")
-        venta = st.number_input("Venta Total del Turno (€)", value=st.session_state.venta_detectada, step=10.0, key="input_vt_formulario")
-        venta_2025 = st.number_input("Venta 2025 (€)", value=st.session_state.venta_2025_detectada, step=10.0, key="input_v25_formulario")
-
-    with col2:
-        venta_entrega = st.number_input("Venta Entrega (€)", value=st.session_state.venta_entrega_detectada, step=10.0, key="input_ve_formulario")
-        venta_llevar = st.number_input("Venta Llevar (€)", value=st.session_state.venta_llevar_detectada, step=10.0, key="input_vll_formulario")
-        venta_ventana = st.number_input("Venta Ventana (€)", value=st.session_state.venta_ventana_detectada, step=10.0, key="input_vv_formulario")
-        venta_come_bebe = st.number_input("Venta Come & Bebe (€)", value=st.session_state.venta_come_bebe_detectada, step=10.0, key="input_vcb_formulario")
-        venta_visa = st.number_input("Venta VISA (€)", value=st.session_state.venta_visa_detectada, step=10.0, key="input_vvi_formulario")
-        venta_efectivo = st.number_input("Venta en Efectivo (€)", value=st.session_state.venta_efectivo_detectada, step=10.0, key="input_vef_formulario")
-
-    with col3:
-        venta_pluxee = st.number_input("Venta Pluxee Gourmet (€)", value=st.session_state.venta_pluxee_detectada, step=10.0, key="input_vp_formulario")
-        quebranto = st.number_input("Importe del Quebranto (€)", value=st.session_state.quebranto_detectado, step=5.0, key="input_quebranto_formulario")
-        ingreso_prosegur = st.number_input("Ingreso Prosegur (€)", value=st.session_state.ingreso_prosegur_detectada, step=10.0, key="input_pro_formulario")
+                            st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
+                            st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
+                            st.session_state.venta_entrega_detectada = convertir_a_float(datos_json.get("venta_entrega"))
+                            st.session_state.venta_llevar_detectada = convertir_a_float(datos_json.get("venta_llevar"))
+                            st.session_state.venta_ventana_detectada = convertir_a_float(datos_json.get("venta_ventana"))
+                            st.session_state.venta_come_bebe_detectada = convertir_a_float(datos_json.get("venta_come_bebe"))
+                            st.session_state.venta_visa_detectada = convertir_a_float(datos_json.get("venta_visa"))
+                            st.session_state.venta_efectivo_detectada = convertir_a_float(datos_json.get("venta_efectivo"))
+                            st.session_state.venta_pluxee_detectada = convertir_a_float(datos_json.get("venta_pluxee"))
+                            st.session_state.quebranto_detectado = convertir_a_float(datos_json.get("quebranto"))
+                            st.session_state.ingreso_prosegur_detectada = convertir_a_float(datos_json.get("ingreso_prosegur"))
+                            st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
