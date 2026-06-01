@@ -1,39 +1,19 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import datetime
 import time
 import base64
+from streamlit_gsheets import GSheetsConnection
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
 # ==========================================
 LISTA_TIENDAS = ["Dp Valdebebas", "Dp Collado", "Dp Paracuellos", "Dp Villanueva", "Dp Galapagar", "Dp Vicálvaro"]
 
-# ==========================================
-# 1. BASE DE DATOS LOCAL
-# ==========================================
-def inicializar_bd():
-    conexion = sqlite3.connect("tiendas.db")
-    cursor = conexion.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recuadros (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tienda TEXT, turno TEXT, encargado TEXT,
-            venta_neta REAL, venta_total REAL, venta_2025 REAL, venta_entrega REAL, venta_llevar REAL,
-            venta_ventana REAL, venta_come_bebe REAL, venta_visa REAL, venta_efectivo REAL, venta_pluxee REAL,
-            quebranto REAL, ingreso_prosegur REAL, web REAL, tgtg REAL, uber_eats REAL, glovo REAL, just_eat REAL, estado_alerta TEXT
-        )
-    """)
-    conexion.commit()
-    conexion.close()
-
-inicializar_bd()
-
-# ==========================================
-# 2. CONFIGURACIÓN DE PÁGINA Y LOGO CORPORATIVO
-# ==========================================
+# CONFIGURACIÓN BÁSICA DE PÁGINA
 st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
 
+# Cargar Logo Corporativo si existe
 def obtener_logo_base64(ruta_imagen):
     try:
         with open(ruta_imagen, "rb") as archivo_img:
@@ -59,6 +39,9 @@ else:
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
+
+# Conexión nativa con la hoja de cálculo de Google
+conn_sheets = st.connection("gsheets", type=GSheetsConnection)
 
 # ------------------------------------------
 # SECCIÓN: ENVÍO DE TIENDAS
@@ -107,25 +90,28 @@ with pestaña_tiendas:
             alerta = "OK"
             if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
+            
+            # Preparar la nueva fila con los nombres exactos de las columnas de tu Excel
+            nueva_fila = pd.DataFrame([{
+                "Fecha": fecha.strftime("%Y-%m-%d"), "Tienda": tienda, "Turno": turno_seleccionado, "Encargado": encargado,
+                "Venta Neta": venta_neta, "Venta Total": venta, "Venta 2025": venta_2025,
+                "Venta Entrega": venta_entrega, "Venta Llevar": venta_llevar, "Venta Ventana": venta_ventana, "Venta Come&Bebe": venta_come_bebe,
+                "Venta Visa": venta_visa, "Venta Efectivo": venta_efectivo, "Venta Pluxee Gourmet": venta_pluxee,
+                "Quebranto": quebranto, "Ingreso Prosegur": ingresado_prosegur, "Web": web, "TGTG": tgtg, "Uber Eats": uber_eats, "Glovo": glovo, "Just Eat": just_eat,
+                "Estado": alerta
+            }])
+            
+            try:
+                # Leer los datos que ya existen en el Sheets, añadir la nueva fila y actualizarlo todo
+                datos_actuales = conn_sheets.read(ttl=0)
+                datos_actualizados = pd.concat([datos_actuales, nueva_fila], ignore_index=True)
+                conn_sheets.update(data=datos_actualizados)
                 
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO recuadros (
-                    fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
-                    venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, estado_alerta
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
-                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                venta_efectivo, venta_pluxee, quebranto, ingresado_prosegur, web, tgtg, uber_eats, glovo, just_eat, alerta
-            ))
-            conn.commit()
-            conn.close()
-            st.success("¡El cierre se ha guardado correctamente!")
-            time.sleep(1)
-            st.rerun()
+                st.success("¡El cierre se ha enviado y guardado directamente en tu Google Sheets!")
+                time.sleep(1)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar en Google Sheets: {e}. Comprueba que has dado permisos de 'Editor'.")
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -149,53 +135,57 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
+    # Panel del Propietario Autenticado leyendo en tiempo real de Google Sheets
     col_header, col_logout = st.columns(2)
     with col_header:
-        st.subheader("📊 Resumen General de Cierres")
+        st.subheader("📊 Resumen General de Cierres (Google Sheets)")
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
     
-    conn = sqlite3.connect("tiendas.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
-    
-    if df.empty:
-        st.info("Aún no se han registrado cierres en la base de datos.")
+    try:
+        # Extraer los datos guardados en el Excel de Google en vivo
+        df = conn_sheets.read(ttl=0)
+    except Exception as e:
+        st.error(f"No se pudo leer la hoja de cálculo: {e}")
+        st.stop()
+        
+    if df.empty or len(df) == 0:
+        st.info("Aún no se han registrado cierres en tu Google Sheets.")
     else:
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
         with col_f2:
-            alertas_disponibles = list(df['estado_alerta'].unique())
+            alertas_disponibles = list(df['Estado'].unique()) if 'Estado' in df.columns else ["OK"]
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
-        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+        # Filtrado en base a lo que el propietario elija en pantalla
+        df_filtrado = df[df['Tienda'].isin(tiendas_filtro) & df['Estado'].isin(alertas_filtro)].copy()
         
-        columnas_mapeo = {
-            'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
-            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
-            'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-            'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
-        }
+        # Columnas esenciales que el dueño quiere ver
+        columnas_visibles = ['Fecha', 'Tienda', 'Turno', 'Encargado', 'Venta Neta', 'Venta Total', 'Venta 2025', 'Venta Visa', 'Venta Efectivo', 'Venta Pluxee Gourmet', 'Quebranto', 'Ingreso Prosegur', 'Estado']
+        df_vista = df_filtrado[[c for c in columnas_visibles if c in df_filtrado.columns]]
         
-        mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
-        df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
-        
-        st.markdown("### 📈 Métricas del Grupo")
+        st.markdown("### 📈 Métricas del Grupo (Totales de Google Sheets)")
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
-            st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            st.metric("Venta Bruta Total", f"{pd.to_numeric(df_filtrado['Venta Total'], errors='coerce').sum():,.2f} €")
         with col_m2:
-            st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            st.metric("Balance de Quebrantos", f"{pd.to_numeric(df_filtrado['Quebranto'], errors='coerce').sum():,.2f} €")
         with col_m3:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
-        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
+        st.subheader("📝 Tabla Histórica de Cierres (Doble clic para editar en tu Google Sheets)")
         
-        # FORMULARIO ULTRA-PLANO Y SEGURO (Sin configuraciones complejas para romper la caché)
-        formulario_dueño = st.form("form_edicion_limpio")
-        tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        # Editor interactivo que modifica las celdas directamente de tu Google Sheets
+        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        
+        if st.button("💾 Guardar Cambios Directo en Google Sheets", type="primary", use_container_width=True):
+            estado_editor = st.session_state["editor_propietario"]
+            
+            # 1. Procesar filas eliminadas directamente en el dataframe global
+            filas_borradas = estado_editor.get("deleted_rows", [])
+            if filas_borradas:
