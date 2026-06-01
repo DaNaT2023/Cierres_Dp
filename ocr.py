@@ -130,15 +130,16 @@ with pestaña_tiendas:
                     bytes_imagen = imagen_subida.read()
                     imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
                     
-                    # Definición de las instrucciones para la extracción de datos financieros
                     prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, sin bloques markdown ni explicaciones."
                     
-                    # Conexión HTTP directa sin usar librerías intermedias que fallen
                     url = "https://together.xyz"
+                    
+                    # CORRECCIÓN DE SINTAXIS SÉGURA EN LA CABECERA (PARENTESIS CORRECTOS)
                     headers = {
-                        "Authorization": f"Bearer {st.secrets['TOGETHER_API_KEY']}",
+                        "Authorization": "Bearer " + str(st.secrets["TOGETHER_API_KEY"]),
                         "Content-Type": "application/json"
-                    )
+                    }
+                    
                     payload = {
                         "model": "meta-llama/Llama-3.2-90B-Vision-Instruct",
                         "messages": [
@@ -146,7 +147,7 @@ with pestaña_tiendas:
                                 "role": "user",
                                 "content": [
                                     {"type": "text", "text": prompt_ocr},
-                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{imagen_base64}"}}
+                                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + str(imagen_base64)}}
                                 ]
                             }
                         ],
@@ -157,16 +158,16 @@ with pestaña_tiendas:
                     
                     if response.status_code == 200:
                         resultado_json = response.json()
-                        texto_respuesta = resultado_json['choices'][0]['message']['content'].strip()
+                        texto_respuesta = resultado_json['choices']['message']['content'].strip()
                     else:
-                        st.error(f"El servidor de Together AI rechazó la clave o la conexión (Código {response.status_code}). Verifica tu API Key en los secretos.")
+                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Verifica tus secretos.")
                         error_detectado = True
                         
                 except Exception as api_err:
                     st.error(f"Error de red: {api_err}")
                     error_detectado = True
 
-                # PROCESAMIENTO SEGURO DEL JSON (FUERA DE LOS BLOQUES DE CONEXIÓN)
+                # PROCESAMIENTO LINEAL
                 if not error_detectado and texto_respuesta:
                     inicio_json = texto_respuesta.find("{")
                     fin_json = texto_respuesta.rfind("}") + 1
@@ -175,7 +176,6 @@ with pestaña_tiendas:
                         try:
                             datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
                             
-                            # Procesar fecha de forma aislada
                             f_str = datos_json.get("fecha", "")
                             st.session_state.fecha_detectada = datetime.date.today()
                             if len(f_str) == 10:
@@ -187,7 +187,6 @@ with pestaña_tiendas:
                             if datos_json.get("tienda") in LISTA_TIENDAS:
                                 st.session_state.tienda_detectada = datos_json.get("tienda")
                             
-                            # Inyección segura de datos en las variables de Streamlit
                             st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
                             st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
                             st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
@@ -204,3 +203,6 @@ with pestaña_tiendas:
                             st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
                             st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
                             st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
+                            st.session_state.glovo_detectada = convertir_a_float(datos_json.get("glovo"))
+                            st.session_state.just_eat_detectada = convertir_a_float(datos_json.get("just_eat"))
+                            
