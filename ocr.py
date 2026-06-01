@@ -30,7 +30,7 @@ def inicializar_bd():
 inicializar_bd()
 
 # ==========================================
-# 2. CONFIGURACIÓN DE PÁGINA Y LOGO CORPORATIVO
+# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
 st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
 
@@ -196,6 +196,6 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
         
-        # Formulario limpio de edición
-        formulario_dueño = st.form("form_edicion_limpio")
-        tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        # FORMULARIO EN BLOQUE SEGURO CON LA INDENTACIÓN ARREGLADA AL MILÍMETRO
+        with st.form("form_edicion_limpio"):
+            tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
