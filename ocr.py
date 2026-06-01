@@ -67,7 +67,7 @@ def inicializar_bd():
 inicializar_bd()
 
 # ==========================================
-# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO (ERROR 12 SOLUCIONADO)
+# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
 try:
     from PIL import Image
@@ -185,26 +185,26 @@ with pestaña_tiendas:
             conn.commit()
             conn.close()
             st.success("¡El cierre de turno se ha guardado correctamente!")
-            time.sleep(1)
+            time.sleep(0.5)
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (MUESTRA PLANA DE 3 COLUMNAS)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA DE LÍNEA HORIZONTAL COMPLETA)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
     clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
     
-    # Detención de seguridad lineal estricta
     if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
         st.info("Escribe las credenciales arriba para activar la tabla de control.")
         st.stop()
 
-    st.success("🔓 Conectado de forma correcta.")
+    st.success("🔓 Concedido acceso completo al histórico horizontal.")
     st.markdown("---")
     
-    # Carga lineal directa sin condiciones de filtrado
+    # Carga lineal directa de la base de datos
     conn = sqlite3.connect("pizzerias_final.db")
-    df_db = pd.read_sql_query("SELECT fecha, tienda, encargado FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+    df_db = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
     conn.close()
     
+    # Si la base de datos está vacía, creamos una fila vacía visual para pintar las columnas en horizontal
