@@ -3,7 +3,9 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-import re
+import requests
+import base64
+import json
 from PIL import Image
 
 # ==========================================
@@ -46,17 +48,13 @@ for campo in NUEVOS_CAMPOS:
         else:
             st.session_state[campo] = 0.0
 
-# Función para buscar un número justo al lado de una palabra clave detectada
-def buscar_cifra(texto, palabra_clave):
-    patron = re.compile(rf"{palabra_clave}\s*[:\-=\s]*\s*([\d.,\s]+)", re.IGNORECASE)
-    coincidencia = patron.search(texto)
-    if coincidencia:
-        valor = coincidencia.group(1).replace("€", "").replace(" ", "").replace(",", ".")
-        try:
-            return float(valor)
-        except:
-            return 0.0
-    return 0.0
+def convertir_a_float(valor):
+    if valor is None:
+        return 0.0
+    try:
+        return float(valor)
+    except:
+        return 0.0
 
 # ==========================================
 # 1. BASE DE DATOS LOCAL
@@ -77,6 +75,156 @@ def inicializar_bd():
             venta_entrega REAL,
             venta_llevar REAL,
             venta_ventana REAL,
+            venta_come_bebe REAL,
+            venta_visa REAL,
+            venta_efectivo REAL,
+            venta_pluxee REAL,
+            quebranto REAL,
+            ingreso_prosegur REAL,
+            web REAL,
+            tgtg REAL,
+            uber_eats REAL,
+            glovo REAL,
+            just_eat REAL,
+            estado_alerta TEXT
+        )
+    """)
+    conexion.commit()
+    conexion.close()
+
+inicializar_bd()
+
+# ==========================================
+# 2. INTERFAZ WEB CON STREAMLIT
+# ==========================================
+st.set_page_config(page_title="Panel Cierre Diario Dp 🍕", layout="wide")
+
+st.title("🍕 Panel Cierre Diario Dp")
+st.markdown("---")
+
+pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
+
+# ------------------------------------------
+# SECCIÓN: ENVÍO DE TIENDAS
+# ------------------------------------------
+with pestaña_tiendas:
+    st.header("Formulario de Cierre de Turno")
+    
+    col_pre1, col_pre2 = st.columns(2)
+    with col_pre1:
+        turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
+    
+    st.subheader("📸 Subir Recuadro Diario")
+    imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
+    
+    if imagen_subida is not None:
+        st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
+        
+        if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Llama Visión Avanzada)..."):
+                texto_respuesta = ""
+                error_detectado = False
+                
+                try:
+                    imagen_subida.seek(0)
+                    bytes_imagen = imagen_subida.read()
+                    imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
+                    
+                    # Prompt ultra detallado estructurado para mapear las 3 columnas y valores unificados
+                    prompt_ocr = f"""
+                    Analiza la imagen de la tabla de caja diaria. Extrae los datos financieros específicamente para el turno de la: **{turno_seleccionado}**.
+                    
+                    Instrucciones de extracción por columnas:
+                    1. Localiza las columnas 'Turno Mañana' y 'Turno Noche'. Extrae los números de la columna que coincida con el turno solicitado ({turno_seleccionado}).
+                    2. Si una etiqueta tiene su cantidad unificada o centrada en una celda compartida para todo el día (como suele pasar con las plataformas Web, TGTG, Uber Eats, Glovo, Just Eat y a veces Venta Total), toma ese valor único sin importar el turno seleccionado.
+                    3. Devuelve los datos estrictamente en este formato JSON puro, sin bloques markdown, sin texto explicativo:
+                    {{
+                        "fecha": "DD/MM/AAAA",
+                        "tienda": "Nombre de la tienda si aparece",
+                        "encargado": "Nombre del encargado de este turno",
+                        "venta_neta": número,
+                        "venta_total": número,
+                        "venta_2025": número,
+                        "venta_entrega": número,
+                        "venta_llevar": número,
+                        "venta_ventana": número,
+                        "venta_come_bebe": número,
+                        "venta_visa": número,
+                        "venta_efectivo": número,
+                        "venta_pluxee": número,
+                        "quebranto": número,
+                        "ingreso_prosegur": número,
+                        "web": número,
+                        "tgtg": número,
+                        "uber_eats": número,
+                        "glovo": número,
+                        "just_eat": número
+                    }}
+                    """
+                    
+                    url = "https://together.xyz"
+                    
+                    # Tu clave limpia fija inyectada directamente en código de forma segura
+                    api_key_fija = "tgp_v1_6xomcp2r7wdNWUv32dUu5UGf1_og47bcFUmZcZs_QQU"
+                    
+                    headers = {
+                        "Authorization": f"Bearer {api_key_fija}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    payload = {
+                        "model": "meta-llama/Llama-3.2-90B-Vision-Instruct",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt_ocr},
+                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{imagen_base64}"}}
+                                ]
+                            }
+                        ],
+                        "temperature": 0.1
+                    }
+                    
+                    response = requests.post(url, headers=headers, json=payload)
+                    
+                    if response.status_code == 200:
+                        resultado_json = response.json()
+                        texto_respuesta = resultado_json['choices']['message']['content'].strip()
+                    else:
+                        st.error(f"Error de comunicación con el servidor (Código {response.status_code}). Comprueba tu panel de Together AI.")
+                        error_detectado = True
+                        
+                except Exception as api_err:
+                    st.error(f"Error en la llamada de red: {api_err}")
+                    error_detectado = True
+
+                # PROCESAMIENTO LINEAL PROTEGIDO
+                if not error_detectado and texto_respuesta:
+                    inicio_json = texto_respuesta.find("{")
+                    fin_json = texto_respuesta.rfind("}") + 1
+                    
+                    if inicio_json != -1 and fin_json != 0:
+                        datos_json = None
+                        try:
+                            datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
+                        except:
+                            st.error("No se pudo descifrar el formato de la respuesta.")
+                        
+                        if datos_json is not None:
+                            f_str = datos_json.get("fecha", "")
+                            st.session_state.fecha_detectada = datetime.date.today()
+                            if len(f_str) == 10:
+                                try:
+                                    st.session_state.fecha_detectada = datetime.datetime.strptime(f_str, "%d/%m/%Y").date()
+                                except:
+                                    pass
+                            
+                            if datos_json.get("tienda") in LISTA_TIENDAS:
+                                st.session_state.tienda_detectada = datos_json.get("tienda")
+                            
+                            st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
+                            st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
             venta_come_bebe REAL,
             venta_visa REAL,
             venta_efectivo REAL,
