@@ -24,7 +24,6 @@ LISTA_TIENDAS = [
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
     cursor = conexion.cursor()
-    # Creamos la tabla con todos los campos reales de tu imagen
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS recuadros (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,7 +101,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO REAL COMPLETO)
+# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO MANUAL)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -194,7 +193,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTILO NATIVO PURO COMPLETO)
+# SECCIÓN: PANEL DEL PROPIETARIO
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
@@ -207,3 +206,6 @@ with pestaña_dueño:
         
         if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.success("¡Acceso concedido!")
+                st.rerun()
