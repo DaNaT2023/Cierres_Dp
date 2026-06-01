@@ -34,7 +34,6 @@ inicializar_bd()
 # ==========================================
 st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
 
-# Función segura para transformar tu logo.png de GitHub en código Base64 para HTML
 def obtener_logo_base64(ruta_imagen):
     try:
         with open(ruta_imagen, "rb") as archivo_img:
@@ -44,7 +43,6 @@ def obtener_logo_base64(ruta_imagen):
 
 logo_codificado = obtener_logo_base64("logo.png")
 
-# CABECERA INTERACTIVA: Si existe logo.png lo coloca alineado, si no, usa la pizza de respaldo
 if logo_codificado:
     st.markdown(
         f"""
@@ -198,7 +196,6 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
         
-        tabla_editada = st.data_editor(
-            df_vista, 
-            use_container_width=True, 
-            hide_index=True,
+        # TABLA EN UNA SOLA LÍNEA LIMPIA (Cero riesgo de SyntaxError)
+        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        
