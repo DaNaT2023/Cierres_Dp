@@ -123,17 +123,14 @@ with pestaña_tiendas:
             st.error("Por favor, introduce el nombre del encargado.")
         else:
             try:
-                # Empaquetamos los 28 datos en una sola línea de texto limpia
                 cadena_datos = f"{fecha.strftime('%Y-%m-%d')},{tienda},{turno_seleccionado},{encargado},{total_pedidos},{deliverys},{venta_neta},{venta},{venta_2025},{venta_entrega},{venta_llevar},{venta_ventana},{venta_come_bebe},{venta_visa},{venta_efectivo},{quebranto},{ingreso_prosegur},{produccion_real},{espera_rack},{media_reparto},{pedidos_mas_45},{pedidos_mas_10_min},{web},{tgtg},{uber_eats},{glovo},{just_eat},{cancelados_motivo.replace(',', ' ')}"
                 
                 url_form_base = st.secrets["URL_GOOGLE_FORM"]
                 campo_entry = st.secrets["ENTRY_ID"]
                 
-                # Montar la URL completa con los datos codificados
                 parametros_url = urllib.parse.urlencode({campo_entry: cadena_datos})
                 url_get_completa = f"{url_form_base}?{parametros_url}"
                 
-                # Lanzar la petición simulando agente Chrome
                 cabeceras_navegador = {'User-Agent': 'Mozilla/5.0'}
                 peticion_segura = urllib.request.Request(url_get_completa, headers=cabeceras_navegador)
                 
@@ -144,10 +141,10 @@ with pestaña_tiendas:
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al transmitir los datos: {e}. Revisa las direcciones de tus Secrets.")
+                st.error(f"Error al transmitir los datos: {e}")
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (ESTRUCTURA CORREGIDA AL 100%)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (CÓDIGO 100% PLANO SECUENCIAL ANTIFALLOS)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
@@ -161,29 +158,34 @@ with pestaña_dueño:
         st.success("🔓 Concedido acceso completo al histórico.")
         st.markdown("---")
         
-        df_db = pd.DataFrame()
+        # DEFINICIÓN DIRECTA PLANA SIN TRY INTERMEDIOS QUE ROMPAN LA COMPILACIÓN
+        sheet_id = "1p8Cy9FNukaXNQ6LZnPXLPhpHsifL0oCW7N1WqtBTcbk"
+        url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=1296960697"
         
-        # Bloque de lectura e importación totalmente blindado y corregido
+        columnas_finales = [
+            "Fecha", "Tienda", "Turno", "Encargado", "Total Pedidos", "Deliverys", 
+            "Venta Neta", "Venta Total", "Venta 2025", "Venta Entrega", "Venta Llevar", 
+            "Venta Ventana", "Venta Come & Bebe", "Venta VISA", "Venta Efectivo", 
+            "Quebranto", "Ingreso Prosegur", "Produccion Real", "Espera Rack", 
+            "Media Reparto", "Pedidos +45%", "Pedidos > 10 min", "Web", "TGTG", 
+            "Uber Eats", "Glovo", "Just Eat", "Cancelados - Motivo"
+        ]
+        
+        # Intentar descargar el CSV de forma directa y limpia
         try:
-            sheet_id = "1p8Cy9FNukaXNQ6LZnPXLPhpHsifL0oCW7N1WqtBTcbk"
-            url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=1296960697"
             df_crudo = pd.read_csv(url_csv)
             
-            columnas_finales = [
-                "Fecha", "Tienda", "Turno", "Encargado", "Total Pedidos", "Deliverys", 
-                "Venta Neta", "Venta Total", "Venta 2025", "Venta Entrega", "Venta Llevar", 
-                "Venta Ventana", "Venta Come & Bebe", "Venta VISA", "Venta Efectivo", 
-                "Quebranto", "Ingreso Prosegur", "Produccion Real", "Espera Rack", 
-                "Media Reparto", "Pedidos +45%", "Pedidos > 10 min", "Web", "TGTG", 
-                "Uber Eats", "Glovo", "Just Eat", "Cancelados - Motivo"
-            ]
-            
+            # Si Google Sheets tiene filas con respuestas de texto en la segunda celda
             listado_filas = []
-            for _, fila in df_crudo.iterrows():
-                if len(fila) >= 2:
-                    texto_celda = str(fila.iloc[1]) # Lee la columna 'Datos' de respuestas
+            for idx in range(len(df_crudo)):
+                fila_actual = df_crudo.iloc[idx]
+                if len(fila_actual) >= 2:
+                    texto_celda = str(fila_actual.iloc[1])
                     partes = texto_celda.split(",")
                     if len(partes) >= 28:
                         listado_filas.append(partes[:28])
             
-            if len(listado_filas) > 0:
+            df_db = pd.DataFrame(listado_filas, columns=columnas_finales)
+        except:
+            df_db = pd.DataFrame()
+            
