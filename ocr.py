@@ -194,9 +194,10 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
+        st.caption("💡 Haz doble clic sobre una celda para corregir datos, selecciona una fila y pulsa 'Suprimir' para borrarla. Al finalizar, pulsa el botón Guardar Cambios.")
         
-        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
-        
-        if st.button("💾 Guardar Cambios en la Base de Datos", type="primary", use_container_width=True):
-            conn = sqlite3.connect("tiendas.db")
+        # MEJORA DE PROCESAMIENTO: Envolvemos el editor dentro de un formulario seguro de Streamlit
+        with st.form("contenedor_edicion_propietario"):
+            tabla_editada = st.data_editor(
+                df_vista, 
+                use_container_width=True, 
