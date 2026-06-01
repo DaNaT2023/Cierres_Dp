@@ -187,7 +187,7 @@ with pestaña_tiendas:
                             st.success("¡Datos cargados con éxito!")
                             st.rerun()
                     else:
-                        st.error("Formarto no válido.")
+                        st.error("Formato no válido.")
 
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
@@ -196,7 +196,6 @@ with pestaña_tiendas:
     if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
         
-    # Formulario compacto adaptado a móviles
     col1, col2, col3 = st.columns(3)
     
     with col1:
