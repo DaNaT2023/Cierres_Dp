@@ -57,7 +57,6 @@ inicializar_bd()
 # ==========================================
 # 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
-# Intentar cargar el logotipo personalizado de Domino's Pizza
 try:
     from PIL import Image
     img_logo = Image.open("logo.png")
@@ -66,15 +65,16 @@ except:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
-# Cabecera de la página web con el logotipo insertado
-if img_logo is not None:
-    col_logo, col_titulo = st.columns([1, 15])
-    with col_logo:
-        st.image(img_logo, width=60)
-    with col_titulo:
-        st.title("Panel Cierre Diario Dp")
-else:
-    st.title("🍕 Panel Cierre Diario Dp")
+# CABECERA CORREGIDA: Alineación simétrica perfecta y en la misma línea
+st.markdown(
+    """
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 5px;">
+        <img src="https://githubusercontent.com" width="55" style="display: block;">
+        <h1 style="margin: 0; padding: 0; font-size: 2.3rem; font-weight: 700; color: #31333F;">Panel Cierre Diario Dp</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.markdown("---")
 
@@ -161,7 +161,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (TOTALMENTE LINEAL)
+# SECCIÓN: PANEL DEL PROPIETARIO
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
@@ -194,7 +194,6 @@ with pestaña_dueño:
         if df.empty:
             st.info("Aún no se han registrado cierres en la base de datos.")
         else:
-            # Lógica secuencial plana sin bloques 'with' de columnas para evitar fallos
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado:", options=alertas_disponibles, default=alertas_disponibles)
