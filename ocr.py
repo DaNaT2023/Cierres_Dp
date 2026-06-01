@@ -66,7 +66,7 @@ with pestaña_tiendas:
         st.subheader("📉 Descuadres")
         venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, step=10.0, key="f_vp")
         quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", value=0.0, step=5.0, key="f_q")
-        ingreso_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, step=10.0, key="f_pro")
+        ingresado_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, step=10.0, key="f_pro")
         st.subheader("🌐 Agregadores y Online")
         web = st.number_input("Web (€)", min_value=0.0, step=10.0, key="f_web")
         tgtg = st.number_input("TGTG (€)", min_value=0.0, step=5.0, key="f_tg")
@@ -94,7 +94,7 @@ with pestaña_tiendas:
             """, (
                 fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
                 venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, alerta
+                venta_efectivo, venta_pluxee, quebranto, ingresado_prosegur, web, tgtg, uber_eats, glovo, just_eat, alerta
             ))
             conn.commit()
             conn.close()
@@ -103,7 +103,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (SIN CONTRASEÑA)
+# SECCIÓN: PANEL DEL PROPIETARIO (DE MOMENTO DIRECTO)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("📊 Resumen General de Cierres")
@@ -115,7 +115,6 @@ with pestaña_dueño:
     if df.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
     else:
-        # Contenedores para organizar los filtros superiores
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
@@ -123,10 +122,8 @@ with pestaña_dueño:
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
-        # Filtrado del DataFrame
         df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
         
-        # Sección de Métricas visuales
         st.markdown("### 📈 Métricas del Grupo")
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
