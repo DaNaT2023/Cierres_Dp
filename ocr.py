@@ -66,7 +66,6 @@ except:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
-# Convertir la imagen local logo.png a Base64 para inyectarla de forma segura en HTML
 def obtener_imagen_base64(ruta_imagen):
     try:
         with open(ruta_imagen, "rb") as archivo_img:
@@ -76,7 +75,6 @@ def obtener_imagen_base64(ruta_imagen):
 
 logo_base64 = obtener_imagen_base64("logo.png")
 
-# CABECERA PERFECTA: Alineada, junta y cargando el logo directamente de forma local
 if logo_base64:
     st.markdown(
         f"""
@@ -103,7 +101,6 @@ with pestaña_tiendas:
     turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     st.markdown("---")
     
-    # Formulario compacto de 3 columnas
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -215,7 +212,12 @@ with pestaña_dueño:
             df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
             
             st.markdown("### 📈 Métricas")
-            st.metric("Venta Bruta Total del Grupo", f"{df_filtrado['venta_total'].sum():,.2f} €")
-            st.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
-            st.write(f"Turnos totales registrados en el filtro: {len(df_filtrado)}")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Venta Bruta Total del Grupo", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            m2.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            m3.metric("Turnos Registrados", len(df_filtrado))
             
+            st.markdown("---")
+            st.subheader("📋 Histórico de Turnos")
+            
+            # Formateador visual directo y seguro para cambiar el nombre de las columnas en la pantalla
