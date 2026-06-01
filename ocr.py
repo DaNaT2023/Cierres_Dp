@@ -134,7 +134,6 @@ with pestaña_tiendas:
                     
                     url = "https://together.xyz"
                     
-                    # CORRECCIÓN DE SINTAXIS SÉGURA EN LA CABECERA (PARENTESIS CORRECTOS)
                     headers = {
                         "Authorization": "Bearer " + str(st.secrets["TOGETHER_API_KEY"]),
                         "Content-Type": "application/json"
@@ -167,15 +166,19 @@ with pestaña_tiendas:
                     st.error(f"Error de red: {api_err}")
                     error_detectado = True
 
-                # PROCESAMIENTO LINEAL
+                # PROCESAMIENTO TOTALMENTE LINEAL SIN BLOQUES TRY ANIDADOS INTERNOS
                 if not error_detectado and texto_respuesta:
                     inicio_json = texto_respuesta.find("{")
                     fin_json = texto_respuesta.rfind("}") + 1
                     
                     if inicio_json != -1 and fin_json != 0:
+                        datos_json = None
                         try:
                             datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
-                            
+                        except:
+                            st.error("No se pudo estructurar el contenido como JSON.")
+                        
+                        if datos_json is not None:
                             f_str = datos_json.get("fecha", "")
                             st.session_state.fecha_detectada = datetime.date.today()
                             if len(f_str) == 10:
@@ -204,5 +207,3 @@ with pestaña_tiendas:
                             st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
                             st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
                             st.session_state.glovo_detectada = convertir_a_float(datos_json.get("glovo"))
-                            st.session_state.just_eat_detectada = convertir_a_float(datos_json.get("just_eat"))
-                            
