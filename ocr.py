@@ -36,7 +36,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (SE QUEDA COMPLETA)
+# SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -103,7 +103,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (VISTA LIMPIA)
+# SECCIÓN: PANEL DEL PROPIETARIO (VISTA LIMPIA Y FORMATEADA)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("📊 Resumen General de Cierres")
@@ -122,27 +122,26 @@ with pestaña_dueño:
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
-        # 1. Aplicamos los filtros seleccionados
+        # Filtrado base
         df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
         
-        # 2. ELIMINAMOS LAS COLUMNAS QUE NO SE DESEAN VER EN EL PANEL DEL PROPIETARIO
+        # Ocultamos los desgloses irrelevantes para el dueño
         columnas_a_eliminar = [
             'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 
             'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe'
         ]
-        # Eliminamos de forma segura solo si existen en el dataframe actual
-        df_vista_propietario = df_filtrado.drop(columns=[col for col in columnas_a_eliminar if col in df_filtrado.columns])
+        df_vista = df_filtrado.drop(columns=[col for col in columnas_a_eliminar if col in df_filtrado.columns])
         
-        # Renombramos algunas columnas para que queden más profesionales en pantalla
+        # Renombramos etiquetas para la cabecera de la tabla
         columnas_nuevas_etiquetas = {
-            'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
-            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta Total', 'venta_2025': 'Venta 2025',
-            'venta_visa': 'Venta Tarjeta', 'venta_efectivo': 'Venta Efectivo', 'venta_pluxee': 'Pluxee',
-            'quebranto': 'Quebranto / Descuadre', 'ingreso_prosegur': 'Ingreso Prosegur', 'estado_alerta': 'Estado'
+            'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
+            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
+            'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
+            'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
         }
-        df_vista_propietario = df_vista_propietario.rename(columns=columnas_nuevas_etiquetas)
+        df_vista = df_vista.rename(columns=columnas_nuevas_etiquetas)
         
-        # 3. Sección de Métricas visuales
+        # Métricas principales superiores
         st.markdown("### 📈 Métricas del Grupo")
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1:
@@ -153,7 +152,21 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
-        st.subheader("📋 Tabla Histórica de Cierres (Vista Simplificada)")
+        st.subheader("📋 Tabla Histórica de Cierres")
         
-        # Mostramos la tabla limpia sin scroll lateral infinito
-        st.dataframe(df_vista_propietario, use_container_width=True, hide_index=True)
+        # Aplicamos el formato de moneda (€) solo a las columnas de dinero en la visualización
+        st.dataframe(
+            df_vista, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
+                "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
+                "Venta 2025": st.column_config.NumberColumn(format="%.2f €"),
+                "Tarjeta": st.column_config.NumberColumn(format="%.2f €"),
+                "Efectivo": st.column_config.NumberColumn(format="%.2f €"),
+                "Pluxee": st.column_config.NumberColumn(format="%.2f €"),
+                "Quebranto": st.column_config.NumberColumn(format="%.2f €"),
+                "Prosegur": st.column_config.NumberColumn(format="%.2f €"),
+            }
+        )
