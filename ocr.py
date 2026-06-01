@@ -124,7 +124,7 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
                 
     else:
-        col_header, col_logout = st.columns([4, 1])
+        col_header, col_logout = st.columns()
         with col_header:
             st.subheader("📊 Resumen General de Cierres")
         with col_logout:
@@ -171,18 +171,15 @@ with pestaña_dueño:
             st.subheader("📝 Tabla Histórica de Cierres (Editable)")
             st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
             
-            # EDITOR INTERACTIVO CON PARÉNTESIS CORRECTAMENTE CERRADO AL FINAL
-            tabla_editada = st.data_editor(
-                df_vista, 
-                use_container_width=True, 
-                hide_index=True,
-                num_rows="dynamic",
-                column_config={
-                    "ID": st.column_config.NumberColumn(disabled=True),
-                    "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
-                    "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
-                    "Venta 2025": st.column_config.NumberColumn(format="%.2f €"),
-                    "Tarjeta": st.column_config.NumberColumn(format="%.2f €"),
-                    "Efectivo": st.column_config.NumberColumn(format="%.2f €"),
-                    "Pluxee": st.column_config.NumberColumn(format="%.2f €"),
-                    "Quebranto": st.column_config.NumberColumn(format="%.2f €"),
+            # CONFIGURACIÓN AISLADA EN VARIABLES (Evita fallos de sintaxis por completo)
+            configuracion_columnas = {
+                "ID": st.column_config.NumberColumn(disabled=True),
+                "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
+                "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
+                "Venta 2025": st.column_config.NumberColumn(format="%.2f €"),
+                "Tarjeta": st.column_config.NumberColumn(format="%.2f €"),
+                "Efectivo": st.column_config.NumberColumn(format="%.2f €"),
+                "Pluxee": st.column_config.NumberColumn(format="%.2f €"),
+                "Quebranto": st.column_config.NumberColumn(format="%.2f €"),
+                "Prosegur": st.column_config.NumberColumn(format="%.2f €"),
+                "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
