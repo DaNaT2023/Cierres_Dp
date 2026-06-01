@@ -168,7 +168,6 @@ with pestaña_dueño:
         with col_f1:
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
         with col_f2:
-            # MEJORA: El filtro ahora selecciona por defecto TODOS los estados para que nunca salga la tabla en blanco
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
         
@@ -195,6 +194,9 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla. Al terminar, pulsa el botón de abajo del todo para confirmar los cambios.")
+        st.caption("💡 Modifica las celdas directamente en la tabla. Al finalizar, pulsa el botón rojo de abajo para confirmar los cambios.")
         
-        # CORRECCIÓN DE REPOSITORIO VISUAL: La tabla vuelve a renderizarse arriba libre de errores
+        # ROMPE-CACHÉ ACTIVADO: Cambiamos la clave a 'editor_v3_fijo' para forzar a Streamlit a pintar la tabla de nuevo
+        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_v3_fijo")
+        
+        st.markdown(" ")
