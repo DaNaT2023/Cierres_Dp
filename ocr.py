@@ -153,9 +153,16 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    col_header, col_logout = st.columns(2)
+    # CABECERA NUEVA CON TRES COLUMNAS: Título, Botón de Refrescar y Botón de Salir
+    col_header, col_refrescar, col_logout = st.columns(3)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
+    with col_refrescar:
+        # Botón nativo para obligar al iPhone a borrar la memoria caché y refrescar los datos
+        if st.button("🔄 Refrescar Datos", use_container_width=True, key="btn_refrescar_datos_iphone"):
+            if "df_original" in st.session_state:
+                del st.session_state.df_original
+            st.rerun()
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
@@ -180,8 +187,6 @@ with pestaña_dueño:
         st.session_state.df_original = df_base
 
     df_vista = st.session_state.df_original
-
-    # RESTAURACIÓN DESDE COMPLETA EXCEL OFICIAL NATAL EN .XLSX
     if df_vista.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
         st.markdown("### 🔄 Restaurar Copia de Seguridad Nativa")
@@ -224,7 +229,6 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        # EXPORTACIÓN EXCEL (.XLSX) OFICIAL REAL SIN ERRORES DE IDIOMA
         buffer_excel = io.BytesIO()
         with pd.ExcelWriter(buffer_excel, engine='openpyxl') as escritor:
             df_vista.to_excel(escritor, index=False, sheet_name='Historial Cierres')
