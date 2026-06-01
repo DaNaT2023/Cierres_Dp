@@ -134,6 +134,7 @@ with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
+    # Control de acceso directo lineal
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -149,6 +150,7 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
+    # Cabecera una vez autenticado
     col_header, col_logout = st.columns(2)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
@@ -194,10 +196,7 @@ with pestaña_dueño:
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Haz doble clic sobre una celda para corregir datos, selecciona una fila y pulsa 'Suprimir' para borrarla. Al finalizar, pulsa el botón Guardar Cambios.")
+        st.caption("💡 Haz doble clic sobre una celda para corregir datos, selecciona una fila y pulsa 'Suprimir' para borrarla. Al finalizar, guarda los cambios.")
         
-        # MEJORA DE PROCESAMIENTO: Envolvemos el editor dentro de un formulario seguro de Streamlit
-        with st.form("contenedor_edicion_propietario"):
-            tabla_editada = st.data_editor(
-                df_vista, 
-                use_container_width=True, 
+        # Bloque de edición protegido dentro de un formulario síncrono
+        with st.form("contenedor_formulario_guardado"):
