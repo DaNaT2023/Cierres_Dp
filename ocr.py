@@ -134,6 +134,7 @@ with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
+    # CORRECCIÓN: Si no está logueado, muestra la caja de login de forma exclusiva
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -147,54 +148,50 @@ with pestaña_dueño:
                 st.rerun()
             else:
                 st.error("Usuario o contraseña incorrectos.")
-        st.stop()
-
-    # Cabecera superior limpia con tres columnas
-    col_header, col_guardar, col_logout = st.columns(3)
-    with col_header:
-        st.subheader("📊 Resumen General de Cierres")
-    with col_guardar:
-        # Botón situado arriba para procesar los cambios sin interferir en el pintado de la tabla
-        ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cabecera_final")
-    with col_logout:
-        if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
-            st.session_state.autenticado = False
-            st.rerun()
-    
-    conn = sqlite3.connect("tiendas.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
-    
-    if df.empty:
-        st.info("Aún no se han registrado cierres en la base de datos.")
+                
+    # CORRECCIÓN: Si SÍ está logueado, ejecuta el código completo de la tabla de forma lineal
     else:
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-        with col_f2:
-            alertas_disponibles = list(df['estado_alerta'].unique())
-            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
+        col_header, col_guardar, col_logout = st.columns(3)
+        with col_header:
+            st.subheader("📊 Resumen General de Cierres")
+        with col_guardar:
+            # El botón se coloca de forma limpia en la barra de arriba
+            ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cabecera_final")
+        with col_logout:
+            if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
+                st.session_state.autenticado = False
+                st.rerun()
         
-        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+        conn = sqlite3.connect("tiendas.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
         
-        columnas_mapeo = {
-            'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
-            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
-            'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-            'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
-        }
-        
-        mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
-        df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
-        
-        st.markdown("### 📈 Métricas del Grupo")
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
-        with col_m2:
-            st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
-        with col_m3:
-            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
-        
-        st.markdown("---")
-        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
+        if df.empty:
+            st.info("Aún no se han registrado cierres en la base de datos.")
+        else:
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+            with col_f2:
+                alertas_disponibles = list(df['estado_alerta'].unique())
+                alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
+            
+            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+            
+            columnas_mapeo = {
+                'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
+                'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
+                'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
+                'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
+            }
+            
+            mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
+            df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
+            
+            st.markdown("### 📈 Métricas del Grupo")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            with col_m2:
+                st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            with col_m3:
