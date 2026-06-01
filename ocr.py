@@ -195,12 +195,10 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        buffer_excel = io.BytesIO()
-        df_vista.to_csv(buffer_excel, index=False, sep=",", encoding='utf-8-sig')
-        excel_descarga = buffer_excel.getvalue()
+        # PROCESADOR DE COPIA DE SEGURIDAD EN FORMATO HTML COMPATIBLE NATALMENTE CON EXCEL (.XLS)
+        html_datos = df_vista.to_html(index=False)
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
-        # CORRECCIÓN AQUÍ: Definimos explícitamente las 4 columnas pasándole el número entero (4)
         col_m1, col_m2, col_m3, col_btn_descarga = st.columns(4)
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
@@ -209,11 +207,12 @@ with pestaña_dueño:
         with col_m3:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         with col_btn_descarga:
+            # Descargamos el archivo como .xls (Formulario Excel HTML universal que abre directo de un clic)
             st.download_button(
-                label="📥 Descargar copia seguridad (.xlsx)",
-                data=excel_descarga,
-                file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                label="📥 Descargar copia seguridad (.xls)",
+                data=html_datos,
+                file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.xls",
+                mime="application/vnd.ms-excel",
                 use_container_width=True,
                 key="btn_descarga_seguridad_propietario"
             )
