@@ -196,6 +196,5 @@ with pestaña_dueño:
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
         st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
         
-        # FORMULARIO EN BLOQUE SEGURO CON LA INDENTACIÓN ARREGLADA AL MILÍMETRO
-        with st.form("form_edicion_limpio"):
-            tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
+        # ELIMINADO EL BLOQUE FORM: Renderizado directo e inmune a errores de submit
+        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
