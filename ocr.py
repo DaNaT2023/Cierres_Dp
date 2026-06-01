@@ -18,11 +18,15 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
+# Inicializar de forma segura las variables de estado
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
 # ==========================================
-# 1. BASE DE DATOS LOCAL CON TU ESTRUCTURA HORIZONTAL
+# 1. BASE DE DATOS LOCAL CON ESTRUCTURA EXACTA HORIZONTAL (29 CAMPOS)
 # ==========================================
 def inicializar_bd():
-    conexion = sqlite3.connect("pizzerias.db")
+    conexion = sqlite3.connect("pizzerias_final.db")
     cursor = conexion.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS recuadros (
@@ -54,7 +58,8 @@ def inicializar_bd():
             uber_eats REAL,
             glovo REAL,
             just_eat REAL,
-            cancelados_motivo TEXT
+            cancelados_motivo TEXT,
+            estado_alerta TEXT
         )
     """)
     conexion.commit()
@@ -162,7 +167,8 @@ with pestaña_tiendas:
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado.")
         else:
-            conn = sqlite3.connect("pizzerias.db")
+            # INSERCIÓN CORREGIDA AL 100% (29 CAMPOS CUADRADOS)
+            conn = sqlite3.connect("pizzerias_final.db")
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO recuadros (
@@ -170,13 +176,13 @@ with pestaña_tiendas:
                     venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, 
                     venta_come_bebe, venta_visa, venta_efectivo, quebranto, ingreso_prosegur, 
                     produccion_real, espera_rack, media_reparto, pedidos_mas_45, pedidos_mas_10_min, 
-                    web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo
+                    web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, estado_alerta
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, total_pedidos, deliverys, venta_neta,
                 venta, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
                 venta_efectivo, quebranto, ingreso_prosegur, produccion_real, espera_rack, media_reparto,
-                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo
+                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, "OK"
             ))
             conn.commit()
             conn.close()
@@ -186,23 +192,18 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (CONTROL EN SIDEBAR INDEPENDIENTE)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTABLE Y ALINEADO)
 # ------------------------------------------
 with pestaña_dueño:
-    st.sidebar.markdown("### 🔒 Control de Acceso")
-    pass_input = st.sidebar.text_input("Introduce la Contraseña de Propietario:", type="password", key="pass_propietario_sidebar")
-    
-    # Comprobación de contraseña en una línea plana que Streamlit recuerda al recargar
-    if pass_input == st.secrets["ADMIN_PASSWORD"]:
-        st.subheader("📊 Resumen General de Cierres")
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido")
+        input_usuario = st.text_input("Usuario", key="login_user_propietario")
+        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
         
-        conn = sqlite3.connect("pizzerias.db")
-        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-        conn.close()
-        
-        if df.empty:
-            st.warning("📥 La base de datos local está limpia. Guarda el primer turno desde la pestaña anterior para ver la información.")
-        else:
-            opciones_tiendas_filtro = ["Todas las Tiendas"] + LISTA_TIENDAS
-            tienda_seleccionada = st.selectbox("Filtrar por Tienda:", opciones_tiendas_filtro, index=0, key="selector_unico_tienda_propietario")
-            
+        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
+            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
+    else:
