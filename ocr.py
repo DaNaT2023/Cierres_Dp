@@ -189,20 +189,19 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA LINEAL PLANA DEFINITIVA ANTIMAPAS)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA PLANA CORREGIDA ANTIMAPAS)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
     clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
     
-    # Comprobación de seguridad directa en un único paso
-    if clave_ingresada == st.secrets["ADMIN_PASSWORD"]:
+    # Detención lineal plana directa para limpiar el error 207 por completo
+    if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
+        if clave_ingresada != "":
+            st.error("⚠️ La contraseña introducida no es correcta.")
+        st.warning("Introduce las credenciales arriba para activar el histórico horizontal.")
+    else:
         st.success("🔓 Concedido acceso completo al histórico horizontal.")
         st.markdown("---")
         
         conn = sqlite3.connect("pizzerias_final.db")
-        df_db = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-        conn.close()
-        
-        columnas_horizontales = [
-            "Fecha", "Tienda", "Turno", "Encargado", "Total Pedidos", "Deliverys", 
