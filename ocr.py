@@ -3,7 +3,9 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-from google import genai  
+from openai import OpenAI
+import base64
+import json
 from PIL import Image
 
 # ==========================================
@@ -30,8 +32,24 @@ if "quebranto_detectado" not in st.session_state:
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
+# Inicializar nuevas variables financieras en el estado de la sesión
+NUEVOS_CAMPOS = [
+    "fecha_detectada", "venta_neta_detectada", "venta_2025_detectada", 
+    "venta_entrega_detectada", "venta_llevar_detectada", "venta_ventana_detectada", 
+    "venta_come_bebe_detectada", "venta_visa_detectada", "venta_efectivo_detectada", 
+    "venta_pluxee_detectada", "ingreso_prosegur_detectada", "web_detectada", 
+    "tgtg_detectada", "uber_eats_detectada", "glovo_detectada", "just_eat_detectada"
+]
+
+for campo in NUEVOS_CAMPOS:
+    if campo not in st.session_state:
+        if "fecha" in campo:
+            st.session_state[campo] = datetime.date.today()
+        else:
+            st.session_state[campo] = 0.0
+
 # ==========================================
-# 1. BASE DE DATOS LOCAL
+# 1. BASE DE DATOS LOCAL (CON TODOS LOS CAMPOS NUEVOS)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -43,8 +61,23 @@ def inicializar_bd():
             tienda TEXT,
             turno TEXT,
             encargado TEXT,
+            venta_neta REAL,
             venta_total REAL,
+            venta_2025 REAL,
+            venta_entrega REAL,
+            venta_llevar REAL,
+            venta_ventana REAL,
+            venta_come_bebe REAL,
+            venta_visa REAL,
+            venta_efectivo REAL,
+            venta_pluxee REAL,
             quebranto REAL,
+            ingreso_prosegur REAL,
+            web REAL,
+            tgtg REAL,
+            uber_eats REAL,
+            glovo REAL,
+            just_eat REAL,
             estado_alerta TEXT
         )
     """)
@@ -80,137 +113,100 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Conectando con Gemini para el turno de la {turno_seleccionado}..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Sin bloqueos)..."):
                 try:
-                    img = Image.open(imagen_subida)
-                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+                    imagen_subida.seek(0)
+                    bytes_imagen = imagen_subida.read()
+                    imagen_base64 = base64.b64encode(bytes_imagen).decode('utf-8')
                     
-                    # PROMPT ULTRA REDUCIDO (Consume 80% menos cuota para evitar el error 429)
+                    # Conexión con Together AI usando OpenAI SDK compatible
+                    client = OpenAI(
+                        base_url="https://together.xyz",
+                        api_key=st.secrets["TOGETHER_API_KEY"]
+                    )
+                    
                     prompt_ocr = f"""
-                    Analiza la imagen de esta tabla de caja para el turno de la **{turno_seleccionado}**.
-                    Extrae estrictamente en este formato exacto:
-                    Tienda: [Uno de estos: {', '.join(LISTA_TIENDAS)}]
-                    Encargado: [Nombre en la sección {turno_seleccionado}]
-                    Venta: [Número bruto de Venta Total de la {turno_seleccionado}. Si está unificada/centrada en una celda compartida para todo el día, copia esa. Ignora el año 2025/2026 y la venta neta]
-                    Quebranto: [Número del quebranto de la {turno_seleccionado}]
+                    Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: **{turno_seleccionado}**.
+                    
+                    Reglas críticas de extracción:
+                    1. Identifica las columnas 'Turno Mañana' y 'Turno Noche'. Extrae los datos de la columna correspondiente al turno solicitado.
+                    2. Si un valor numérico está unificado, centrado o solo aparece una cifra para todo el día (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único independientemente del turno seleccionado.
+                    3. Devuelve los datos estrictamente en este formato JSON, sin texto adicional, sin bloques de código markdown, solo el objeto JSON limpio:
+                    {{
+                        "fecha": "DD/MM/AAAA",
+                        "tienda": "Especifica el nombre de la tienda si aparece, o dejas vacío",
+                        "encargado": "Nombre del encargado del turno",
+                        "venta_neta": número,
+                        "venta_total": número,
+                        "venta_2025": número,
+                        "venta_entrega": número,
+                        "venta_llevar": número,
+                        "venta_ventana": número,
+                        "venta_come_bebe": número,
+                        "venta_visa": número,
+                        "venta_efectivo": número,
+                        "venta_pluxee": número,
+                        "quebranto": número,
+                        "ingreso_prosegur": número,
+                        "web": número,
+                        "tgtg": número,
+                        "uber_eats": número,
+                        "glovo": número,
+                        "just_eat": número
+                    }}
                     """
                     
-                    response_ocr = None
-                    intentos = 0
-                    tiempo_espera = 2
+                    response = client.chat.completions.create(
+                        model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt_ocr},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{imagen_base64}"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        temperature=0.1
+                    )
                     
-                    while intentos < 3:
-                        try:
-                            response_ocr = client.models.generate_content(
-                                model="gemini-2.5-flash",
-                                contents=[img, prompt_ocr]
-                            )
-                            break
-                        except Exception as api_error:
-                            if "429" in str(api_error):
-                                intentos += 1
-                                if intentos == 3:
-                                    raise api_error
-                                time.sleep(tiempo_espera)
-                                tiempo_espera *= 2
-                            else:
-                                raise api_error
+                    texto_limpio = response.choices.message.content.replace("```json", "").replace("```", "").strip()
+                    datos = json.loads(texto_limpio)
                     
-                    texto_extraido = response_ocr.text
-                    st.info("Datos detectados en la imagen:")
-                    st.text(texto_extraido)
+                    # Mapear datos a variables de sesión de Streamlit
+                    try:
+                        st.session_state.fecha_detectada = datetime.datetime.strptime(datos.get("fecha", ""), "%d/%m/%Y").date()
+                    except:
+                        st.session_state.fecha_detectada = datetime.date.today()
+                        
+                    if datos.get("tienda") in LISTA_TIENDAS:
+                        st.session_state.tienda_detectada = datos.get("tienda")
+                        
+                    st.session_state.encargado_detectado = datos.get("encargado", "")
+                    st.session_state.venta_neta_detectada = float(datos.get("venta_neta", 0.0))
+                    st.session_state.venta_detectada = float(datos.get("venta_total", 0.0))
+                    st.session_state.venta_2025_detectada = float(datos.get("venta_2025", 0.0))
+                    st.session_state.venta_entrega_detectada = float(datos.get("venta_entrega", 0.0))
+                    st.session_state.venta_llevar_detectada = float(datos.get("venta_llevar", 0.0))
+                    st.session_state.venta_ventana_detectada = float(datos.get("venta_ventana", 0.0))
+                    st.session_state.venta_come_bebe_detectada = float(datos.get("venta_come_bebe", 0.0))
+                    st.session_state.venta_visa_detectada = float(datos.get("venta_visa", 0.0))
+                    st.session_state.venta_efectivo_detectada = float(datos.get("venta_efectivo", 0.0))
+                    st.session_state.venta_pluxee_detectada = float(datos.get("venta_pluxee", 0.0))
+                    st.session_state.quebranto_detectado = float(datos.get("quebranto", 0.0))
+                    st.session_state.ingreso_prosegur_detectada = float(datos.get("ingreso_prosegur", 0.0))
+                    st.session_state.web_detectada = float(datos.get("web", 0.0))
+                    st.session_state.tgtg_detectada = float(datos.get("tgtg", 0.0))
+                    st.session_state.uber_eats_detectada = float(datos.get("uber_eats", 0.0))
+                    st.session_state.glovo_detectada = float(datos.get("glovo", 0.0))
+                    st.session_state.just_eat_detectada = float(datos.get("just_eat", 0.0))
                     
-                    for linea in texto_extraido.split("\n"):
-                        if ":" in linea:
-                            clave, valor = linea.split(":", 1)
-                            clave = clave.strip().lower()
-                            valor = valor.strip()
-                            
-                            if clave == "tienda" and valor in LISTA_TIENDAS:
-                                st.session_state.tienda_detectada = valor
-                            elif clave == "encargado":
-                                st.session_state.encargado_detectado = valor
-                            elif clave == "venta":
-                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                if valor_limpio not in ["2025", "2026", "2025.0", "2026.0"]:
-                                    if valor_limpio.replace(".", "", 1).isdigit():
-                                        st.session_state.venta_detectada = float(valor_limpio)
-                            elif clave == "quebranto":
-                                valor_limpio = valor.replace("€", "").replace(" ", "").replace(",", ".")
-                                test_val = valor_limpio.replace("-", "", 1).replace(".", "", 1)
-                                if test_val.isdigit():
-                                    st.session_state.quebranto_detectado = float(valor_limpio)
-                                
-                    st.success("¡Datos rellenados automáticamente!")
+                    st.success("¡Datos del recuadro cargados con éxito desde el saldo de Together AI!")
                     st.rerun()
                     
                 except Exception as e:
-                    st.error("Google está saturado (Error 429). No te preocupes, puedes rellenar o corregir los campos a mano abajo directamente.")
-
-    st.markdown("---")
-    st.subheader("📝 Confirmar Datos del Formulario")
-    
-    tienda_idx = 0
-    if st.session_state.tienda_detectada in LISTA_TIENDAS:
-        tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
-        
-    col_izq, col_der = st.columns(2)
-    
-    with col_izq:
-        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
-        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
-        
-    with col_der:
-        fecha = st.date_input("Fecha del Recuadro", datetime.date.today(), key="input_fecha_formulario")
-        venta = st.number_input("Venta Total del Turno (€)", min_value=0.0, step=10.0, value=st.session_state.venta_detectada, key="input_venta_formulario")
-        quebranto = st.number_input("Importe del Quebranto (€)", step=5.0, value=st.session_state.quebranto_detectado, key="input_quebranto_formulario")
-
-    if st.button("🚀 Procesar y Guardar Registro", key="btn_guardar_registro_bd"):
-        if encargado.strip() == "":
-            st.error("Por favor, introduce el nombre del encargado.")
-        else:
-            alerta = "OK"
-            if quebranto <= -100:
-                alerta = "🚨 CRÍTICO (Pérdida)"
-            elif quebranto >= 100:
-                alerta = "⚠️ ATENCIÓN (Exceso)"
-                
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO recuadros (fecha, tienda, turno, encargado, venta_total, quebranto, estado_alerta)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta, quebranto, alerta))
-            conn.commit()
-            conn.close()
-            
-            st.success(f"¡Datos de {tienda} ({turno_seleccionado}) guardados con éxito!")
-            
-            st.session_state.encargado_detectado = ""
-            st.session_state.venta_detectada = 0.0
-            st.session_state.quebranto_detectado = 0.0
-            st.rerun()
-
-# ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (PROTEGIDO)
-# ------------------------------------------
-with pestaña_dueño:
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido al Propietario")
-        st.write("Por favor, introduce tus credenciales para ver el histórico y acceder a las funciones de edición.")
-        
-        input_usuario = st.text_input("Usuario", key="login_user_propietario")
-        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
-        
-        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
-            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.success("¡Acceso concedido!")
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
-    else:
-        if st.button("🔒 Cerrar Sesión (Ocultar Todo)", key="btn_cerrar_sesion_propietario"):
-            st.session_state.autenticado = False
-            st.rerun()
-            
