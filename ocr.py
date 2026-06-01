@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import time
 import base64
+import io
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -220,4 +221,5 @@ with pestaña_dueño:
             st.markdown("---")
             st.subheader("📋 Histórico de Turnos")
             
-            # Formateador visual directo y seguro para cambiar el nombre de las columnas en la pantalla
+            # Forzar la carga limpia de la tabla para que no se oculte en Streamlit
+            st.dataframe(
