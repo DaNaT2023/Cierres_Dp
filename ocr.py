@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import time
 import base64
+import io
 import urllib.parse
 import urllib.request
 
@@ -59,7 +60,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN 1: FORMULARIO DE ENVÍO INVISIBLE A TRAVÉS DE GOOGLE FORMS
+# SECCIÓN 1: FORMULARIO DE ENVÍO DIRECTO A GOOGLE FORMS (MÉTODO GET BLINDADO)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -122,27 +123,32 @@ with pestaña_tiendas:
             st.error("Por favor, introduce el nombre del encargado.")
         else:
             try:
-                # Empaquetamos los 28 datos en una sola línea de texto separada por comas
+                # Empaquetamos los 28 datos en una sola línea de texto limpia
                 cadena_datos = f"{fecha.strftime('%Y-%m-%d')},{tienda},{turno_seleccionado},{encargado},{total_pedidos},{deliverys},{venta_neta},{venta},{venta_2025},{venta_entrega},{venta_llevar},{venta_ventana},{venta_come_bebe},{venta_visa},{venta_efectivo},{quebranto},{ingreso_prosegur},{produccion_real},{espera_rack},{media_reparto},{pedidos_mas_45},{pedidos_mas_10_min},{web},{tgtg},{uber_eats},{glovo},{just_eat},{cancelados_motivo.replace(',', ' ')}"
                 
-                # Envío directo simulando HTTP POST de Google Forms nativo
-                url_form = st.secrets["URL_GOOGLE_FORM"]
+                # REPARACIÓN RADICAL: Envío mediante simulación GET limpia nativa por cabecera de navegador (Evita error 401)
+                url_form_base = st.secrets["URL_GOOGLE_FORM"].replace("/formResponse", "/formResponse")
                 campo_entry = st.secrets["ENTRY_ID"]
                 
-                valores_post = {campo_entry: cadena_datos}
-                datos_codificados = urllib.parse.urlencode(valores_post).encode('utf-8')
+                # Montar la URL completa con los datos codificados directamente en la barra de direcciones
+                parametros_url = urllib.parse.urlencode({campo_entry: cadena_datos})
+                url_get_completa = f"{url_form_base}?{parametros_url}"
                 
-                peticion = urllib.request.Request(url_form, data=datos_codificados)
-                urllib.request.urlopen(peticion)
+                # Lanzar la petición simulando un agente de navegador Chrome normal
+                cabeceras_navegador = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                peticion_segura = urllib.request.Request(url_get_completa, headers=cabeceras_navegador)
                 
-                st.success("🚀 ¡Registro guardado y transmitido con éxito a tu nube de Google!")
+                with urllib.request.urlopen(peticion_segura) as respuesta:
+                    pass
+                
+                st.success("🚀 ¡Registro transmitido e inyectado correctamente en tu Google Sheets!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al transmitir los datos: {e}")
+                st.error(f"Error al transmitir los datos: {e}. Revisa las direcciones de tus Secrets.")
 
 # ------------------------------------------
-# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA DIRECTA DESDE LA PESTAÑA DE RESPUESTAS CORREGIDA)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (LECTURA DIRECTA DE LA HOJA DE RESPUESTAS)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
@@ -157,12 +163,12 @@ with pestaña_dueño:
         st.markdown("---")
         
         try:
-            # Extraer de forma limpia el ID único de la URL
             url_base = st.secrets["URL_GOOGLE_SHEETS"]
+            # Extraer de forma segura el ID del documento
             sheet_id = url_base.split("/d/")[1].split("/")[0]
             
-            # CORRECCIÓN EN LA ID DE LECTURA (gid=129696097 apunta directamente a tu hoja morada)
-            url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=129696097"
+            # Conexión directa a la pestaña morada de Google Forms (gid=1296960697)
+            url_csv = f"https://google.com{sheet_id}/export?format=csv&gid=1296960697"
             df_crudo = pd.read_csv(url_csv)
             
             columnas_finales = [
@@ -175,15 +181,3 @@ with pestaña_dueño:
             ]
             
             listado_filas = []
-            for _, fila in df_crudo.iterrows():
-                # Google Forms guarda las respuestas en la columna 2 (columna 'Datos')
-                if len(fila) >= 2:
-                    texto_celda = str(fila.iloc[1])
-                    partes = texto_celda.split(",")
-                    if len(partes) >= 28:
-                        listado_filas.append(partes[:28])
-            
-            df_db = pd.DataFrame(listado_filas, columns=columnas_finales)
-        except Exception as err:
-            df_db = pd.DataFrame()
-        
