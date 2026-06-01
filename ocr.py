@@ -193,7 +193,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (CÓDIGO PLANO SIN BLOQUES DE VERIFICACIÓN)
+# SECCIÓN: PANEL DEL PROPIETARIO
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("📊 Resumen General de Cierres")
@@ -202,13 +202,11 @@ with pestaña_dueño:
     df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
     conn.close()
     
+    # CONTROL DE SEGURIDAD TOTAL: Si no hay filas, avisa de forma limpia y evita el cuelgue
     if df.empty:
-        st.info("Aún no se han registrado cierres en la base de datos.")
+        st.warning("📥 La base de datos está actualmente vacía. Rellena y guarda el primer turno desde la pestaña de envío para activar el histórico.")
     else:
-        # Filtro automático: por defecto selecciona todas las tiendas
         tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
         if not tiendas_filtro:
             tiendas_filtro = LISTA_TIENDAS
             
-        df_filtrado = df[df['tienda'].isin(tiendas_filtro)].copy()
-        
