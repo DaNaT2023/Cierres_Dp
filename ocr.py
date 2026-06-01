@@ -193,10 +193,10 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         
         st.markdown("---")
+        
+        # UBICACIÓN NUEVA: El botón de guardar se pinta arriba de la tabla para que esté siempre visible
+        ejecutar_guardado = st.button("💾 Guardar Cambios Realizados", use_container_width=True, type="primary", key="btn_guardar_cambios_propietario")
+        
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla y pulsa el botón azul de abajo al terminar para recalcular el Estado.")
+        st.caption("💡 Modifica las celdas directamente en la tabla y pulsa el botón azul de ARRIBA al terminar para recalcular el Estado.")
         
-        # ELIMINADO EL FORMULARIO POR COMPLETO: Renderizado directo sin posibilidad de error rosa
-        tabla_editada = st.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", key="editor_propietario")
-        
-        # Botón normal plano fuera de formularios
