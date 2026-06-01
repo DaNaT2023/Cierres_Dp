@@ -181,23 +181,19 @@ with pestaña_dueño:
 
     df_vista = st.session_state.df_original
 
-    # RESTAURACIÓN REPARADA: Lee el .xls nativo como HTML sin usar openpyxl
+    # RESTAURACIÓN DESDE COMPLETA EXCEL OFICIAL NATAL EN .XLSX
     if df_vista.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
-        st.markdown("### 🔄 Restaurar Copia de Seguridad")
-        st.caption("Sube aquí tu archivo .xls descargado previamente para recuperar todo el historial:")
+        st.markdown("### 🔄 Restaurar Copia de Seguridad Nativa")
+        st.caption("Sube tu archivo .xlsx guardado previamente para recuperar el historial íntegro:")
         
-        archivo_subido = st.file_uploader("Selecciona el archivo de copia de seguridad:", type=["xls"], key="recuperacion_vacia_dueño")
+        archivo_subido = st.file_uploader("Selecciona el archivo de copia de seguridad:", type=["xlsx"], key="recuperacion_vacia_dueño")
         if archivo_subido is not None:
             try:
-                # Al ser un .xls creado por nosotros, se lee de forma directa y ultra-rápida como HTML plano
-                listas_df = pd.read_html(archivo_subido)
-                df_recuperado = listas_df[0]
-                
+                df_recuperado = pd.read_excel(archivo_subido, engine='openpyxl')
                 mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
                 df_recuperado_bd = df_recuperado.rename(columns=mapeo_inverso_bd)
                 
-                # Nos aseguramos de que el orden de columnas sea idéntico
                 columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'estado_alerta']
                 for col in columnas_db:
                     if col not in df_recuperado_bd.columns:
@@ -228,8 +224,11 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        html_crudo = df_vista.to_html(index=False)
-        html_perfecto = f"<meta charset='utf-8'>\n{html_crudo}"
+        # EXPORTACIÓN EXCEL (.XLSX) OFICIAL REAL SIN ERRORES DE IDIOMA
+        buffer_excel = io.BytesIO()
+        with pd.ExcelWriter(buffer_excel, engine='openpyxl') as escritor:
+            df_vista.to_excel(escritor, index=False, sheet_name='Historial Cierres')
+        excel_descarga = buffer_excel.getvalue()
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
         col_m1, col_m2, col_m3, col_btn_descarga = st.columns(4)
@@ -241,24 +240,21 @@ with pestaña_dueño:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         with col_btn_descarga:
             st.download_button(
-                label="📥 Descargar copia seguridad (.xls)",
-                data=html_perfecto,
-                file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.xls",
-                mime="application/vnd.ms-excel",
+                label="📥 Descargar copia seguridad (.xlsx)",
+                data=excel_descarga,
+                file_name=f"copia_seguridad_cierres_dp_{fecha_hoy}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
                 key="btn_descarga_seguridad_propietario"
             )
             
         st.markdown(" ")
         with st.expander("🔄 Importar / Añadir cierres desde un archivo copia externa"):
-            # REPARADO: Solo acepta archivos .xls generados por el propio botón de descarga
-            archivo_añadir = st.file_uploader("Sube tu archivo .xls de copia de seguridad:", type=["xls"], key="recuperacion_activa_dueño")
+            archivo_añadir = st.file_uploader("Sube tu archivo .xlsx de copia de seguridad:", type=["xlsx"], key="recuperacion_activa_dueño")
             if archivo_añadir is not None:
                 if st.button("⚡ Confirmar inserción masiva de datos", use_container_width=True, type="secondary"):
                     try:
-                        listas_df = pd.read_html(archivo_añadir)
-                        df_extraido = listas_df[0]
-                        
+                        df_extraido = pd.read_excel(archivo_añadir, engine='openpyxl')
                         mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
                         df_extraido_bd = df_extraido.rename(columns=mapeo_inverso_bd)
                         
@@ -269,7 +265,7 @@ with pestaña_dueño:
                         df_extraido_bd.to_sql("recuadros", conn, if_exists="append", index=False)
                         conn.close()
                         
-                        st.success("¡Datos inyectados y consolidados correctamente!")
+                        st.success("¡Datos inyectados y consolidados de forma nativa!")
                         if "df_original" in st.session_state:
                             del st.session_state.df_original
                         time.sleep(1)
