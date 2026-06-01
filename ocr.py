@@ -113,7 +113,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Llama 90B Vision)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI..."):
                 try:
                     imagen_subida.seek(0)
                     bytes_imagen = imagen_subida.read()
@@ -133,29 +133,28 @@ with pestaña_tiendas:
                     3. Devuelve los datos estrictamente en este formato JSON, sin texto adicional explicativo, sin bloques de código markdown, solo el objeto JSON limpio:
                     {{
                         "fecha": "DD/MM/AAAA",
-                        "tienda": "Especifica el nombre de la tienda si aparece, o dejas vacío",
-                        "encargado": "Nombre del encargado del turno",
-                        "venta_neta": número,
-                        "venta_total": número,
-                        "venta_2025": número,
-                        "venta_entrega": número,
-                        "venta_llevar": número,
-                        "venta_ventana": número,
-                        "venta_come_bebe": número,
-                        "venta_visa": número,
-                        "venta_efectivo": número,
-                        "venta_pluxee": número,
-                        "quebranto": número,
-                        "ingreso_prosegur": número,
-                        "web": número,
-                        "tgtg": número,
-                        "uber_eats": número,
-                        "glovo": número,
-                        "just_eat": número
+                        "tienda": "Nombre exacto",
+                        "encargado": "Nombre del encargado",
+                        "venta_neta": 0.0,
+                        "venta_total": 0.0,
+                        "venta_2025": 0.0,
+                        "venta_entrega": 0.0,
+                        "venta_llevar": 0.0,
+                        "venta_ventana": 0.0,
+                        "venta_come_bebe": 0.0,
+                        "venta_visa": 0.0,
+                        "venta_efectivo": 0.0,
+                        "venta_pluxee": 0.0,
+                        "quebranto": 0.0,
+                        "ingreso_prosegur": 0.0,
+                        "web": 0.0,
+                        "tgtg": 0.0,
+                        "uber_eats": 0.0,
+                        "glovo": 0.0,
+                        "just_eat": 0.0
                     }}
                     """
                     
-                    # Llamada corregida usando el modelo avanzado compatible Llama 3.2 90B Vision
                     response = client.chat.completions.create(
                         model="meta-llama/Llama-3.2-90B-Vision-Instruct",
                         messages=[
@@ -178,15 +177,19 @@ with pestaña_tiendas:
                     texto_limpio = response.choices.message.content.replace("```json", "").replace("```", "").strip()
                     datos = json.loads(texto_limpio)
                     
-                    try:
-                        st.session_state.fecha_detectada = datetime.datetime.strptime(datos.get("fecha", ""), "%d/%m/%Y").date()
-                    except Exception as e_fecha:
-                        st.session_state.fecha_detectada = datetime.date.today()
-                        
+                    # Asignación de datos linealizada sin bloques de indentación complejos
+                    fecha_str = datos.get("fecha", "")
+                    st.session_state.fecha_detectada = datetime.date.today()
+                    if len(fecha_str) == 10:
+                        try:
+                            st.session_state.fecha_detectada = datetime.datetime.strptime(fecha_str, "%d/%m/%Y").date()
+                        except:
+                            pass
+                            
                     if datos.get("tienda") in LISTA_TIENDAS:
                         st.session_state.tienda_detectada = datos.get("tienda")
                         
-                    st.session_state.encargado_detectado = datos.get("encargado", "")
+                    st.session_state.encargado_detectado = str(datos.get("encargado", ""))
                     st.session_state.venta_neta_detectada = float(datos.get("venta_neta", 0.0))
                     st.session_state.venta_detectada = float(datos.get("venta_total", 0.0))
                     st.session_state.venta_2025_detectada = float(datos.get("venta_2025", 0.0))
@@ -205,7 +208,9 @@ with pestaña_tiendas:
                     st.session_state.glovo_detectada = float(datos.get("glovo", 0.0))
                     st.session_state.just_eat_detectada = float(datos.get("just_eat", 0.0))
                     
-                    st.success("¡Datos del recuadro cargados con éxito desde el saldo de Together AI!")
+                    st.success("¡Datos del recuadro cargados con éxito!")
                     st.rerun()
                     
-                except Exception as e:
+                except Exception as error_ia:
+                    st.error(f"Error en el motor: {error_ia}")
+
