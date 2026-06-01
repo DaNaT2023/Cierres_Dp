@@ -106,11 +106,9 @@ with pestaña_tiendas:
 # SECCIÓN: PANEL DEL PROPIETARIO (CON ACCESO RESTRINGIDO)
 # ------------------------------------------
 with pestaña_dueño:
-    # Inicializar la variable de sesión para controlar si está logueado o no
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
 
-    # CASO A: No está autenticado -> Mostrar pantalla de Login
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -125,10 +123,8 @@ with pestaña_dueño:
             else:
                 st.error("Usuario o contraseña incorrectos.")
                 
-    # CASO B: Sí está autenticado -> Mostrar el panel completo de control
     else:
-        # Botón elegante en la esquina superior para poder salir
-        col_header, col_logout = st.columns([6, 1])
+        col_header, col_logout = st.columns([4, 1])
         with col_header:
             st.subheader("📊 Resumen General de Cierres")
         with col_logout:
@@ -150,10 +146,8 @@ with pestaña_dueño:
                 alertas_disponibles = list(df['estado_alerta'].unique())
                 alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
             
-            # Filtrado base
             df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
             
-            # Mapeo de nombres internos a etiquetas visibles limpias
             columnas_mapeo = {
                 'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
                 'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
@@ -164,7 +158,6 @@ with pestaña_dueño:
             mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
             df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
             
-            # Métricas principales superiores
             st.markdown("### 📈 Métricas del Grupo")
             col_m1, col_m2, col_m3 = st.columns(3)
             with col_m1:
@@ -178,7 +171,7 @@ with pestaña_dueño:
             st.subheader("📝 Tabla Histórica de Cierres (Editable)")
             st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
             
-            # Editor interactivo protegido por la sesión
+            # EDITOR INTERACTIVO CON PARÉNTESIS CORRECTAMENTE CERRADO AL FINAL
             tabla_editada = st.data_editor(
                 df_vista, 
                 use_container_width=True, 
@@ -188,3 +181,8 @@ with pestaña_dueño:
                     "ID": st.column_config.NumberColumn(disabled=True),
                     "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
                     "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
+                    "Venta 2025": st.column_config.NumberColumn(format="%.2f €"),
+                    "Tarjeta": st.column_config.NumberColumn(format="%.2f €"),
+                    "Efectivo": st.column_config.NumberColumn(format="%.2f €"),
+                    "Pluxee": st.column_config.NumberColumn(format="%.2f €"),
+                    "Quebranto": st.column_config.NumberColumn(format="%.2f €"),
