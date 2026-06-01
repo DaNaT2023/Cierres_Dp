@@ -195,13 +195,13 @@ with pestaña_dueño:
         
         st.markdown("### 📈 Métricas del Grupo")
         
-        # PROCESADOR DE EXPORTACIÓN EXCEL (.XLSX) BLINDADO SIN PAQUETES EXTERNOS
         buffer_excel = io.BytesIO()
         df_vista.to_csv(buffer_excel, index=False, sep=",", encoding='utf-8-sig')
         excel_descarga = buffer_excel.getvalue()
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
-        col_m1, col_m2, col_m3, col_btn_descarga = st.columns()
+        # CORRECCIÓN AQUÍ: Definimos explícitamente las 4 columnas pasándole el número entero (4)
+        col_m1, col_m2, col_m3, col_btn_descarga = st.columns(4)
         with col_m1:
             st.metric("Venta Bruta Total", f"{df_filtrado['Venta Bruta'].sum():,.2f} €")
         with col_m2:
@@ -209,7 +209,6 @@ with pestaña_dueño:
         with col_m3:
             st.metric("Turnos Registrados", f"{len(df_filtrado)}")
         with col_btn_descarga:
-            # El archivo se descarga en formato .xlsx binario universal compatible directo con Excel Office
             st.download_button(
                 label="📥 Descargar copia seguridad (.xlsx)",
                 data=excel_descarga,
