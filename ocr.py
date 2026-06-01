@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import sqlite3
 import pandas as pd
 import datetime
@@ -12,7 +12,7 @@ import io
 LISTA_TIENDAS = ["Dp Valdebebas", "Dp Collado", "Dp Paracuellos", "Dp Villanueva", "Dp Galapagar", "Dp Vicálvaro"]
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL
+# 1. BASE DE DATOS LOCAL (CON NUEVA COLUMNA DE OBSERVACIONES DIRECCIÓN)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -23,9 +23,14 @@ def inicializar_bd():
             venta_neta REAL, venta_total REAL, venta_2025 REAL, venta_entrega REAL, venta_llevar REAL,
             venta_ventana REAL, venta_come_bebe REAL, venta_visa REAL, venta_efectivo REAL, venta_pluxee REAL,
             quebranto REAL, ingreso_prosegur REAL, web REAL, tgtg REAL, uber_eats REAL, glovo REAL, just_eat REAL, 
-            cancelaciones_obs TEXT, estado_alerta TEXT
+            cancelaciones_obs TEXT, estado_alerta TEXT, anotaciones_jefe TEXT
         )
     """)
+    # Parche de seguridad para bases de datos ya existentes en producción
+    try:
+        cursor.execute("ALTER TABLE recuadros ADD COLUMN anotaciones_jefe TEXT")
+    except sqlite3.OperationalError:
+        pass
     conexion.commit()
     conexion.close()
 
@@ -34,7 +39,6 @@ inicializar_bd()
 # ==========================================
 # 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
-# CAMBIO: Título de página acortado
 st.set_page_config(page_title="Cierre Diario DP", layout="wide")
 
 def obtener_logo_base64(ruta_imagen):
@@ -46,7 +50,6 @@ def obtener_logo_base64(ruta_imagen):
 
 logo_codificado = obtener_logo_base64("logo.png")
 
-# CAMBIO: Cabecera visual de la app actualizada a "Cierre Diario DP"
 if logo_codificado:
     st.markdown(
         f"""
@@ -63,12 +66,10 @@ else:
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
-
 # ------------------------------------------
 # SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
-    # CAMBIO: Título simplificado de la sección
     st.header("📝 Cierre de Turno")
     turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="sel_turno")
     st.markdown("---")
@@ -80,18 +81,15 @@ with pestaña_tiendas:
         encargado = st.text_input("Nombre del Encargado", placeholder="Escribe tu nombre", key="f_enc")
         fecha = st.date_input("Fecha del Cierre", value=datetime.date.today(), key="f_fecha")
         
-        # CAMBIO: value=None para eliminar el "0.0" inicial y placeholder limpio
         st.subheader("💰 Totales Caja")
         venta_neta = st.number_input("Venta Neta (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vn")
         venta = st.number_input("Venta Total / Bruta (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vt")
         venta_2025 = st.number_input("Venta 2025 (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_v25")
         
-        # CAMBIO: Nuevo grupo de incidencias de texto debajo de Totales Caja
         st.subheader("💬 Cancelaciones y observaciones")
         incidencias_texto = st.text_area("Escribe aquí cualquier incidencia o comentario del turno:", placeholder="Ej. Cancelación de pedido por retraso, descuadre de moto...", key="f_obs")
 
     with col2:
-        # CAMBIO: Título corregido ortográficamente a "Desglose de Canales" y value=None
         st.subheader("🛵 Desglose de Canales")
         venta_entrega = st.number_input("Venta Entrega (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_ve")
         venta_llevar = st.number_input("Venta Llevar (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vll")
@@ -101,14 +99,13 @@ with pestaña_tiendas:
         st.subheader("💳 Métodos de Pago")
         venta_visa = st.number_input("Venta VISA / Tarjeta (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vvi")
         venta_efectivo = st.number_input("Venta en Efectivo (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vef")
+
     with col3:
-        # CAMBIO: value=None en descuadres
         st.subheader("📉 Descuadres")
         quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", step=5.0, value=None, placeholder="Escribe la cantidad...", key="f_q")
         ingresado_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_pro")
         
         st.subheader("🌐 Agregadores y Online")
-        # CAMBIO: Pluxee Gourmet reubicado en este grupo y con value=None
         venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vp")
         web = st.number_input("Web (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_web")
         tgtg = st.number_input("TGTG (€)", min_value=0.0, step=5.0, value=None, placeholder="Escribe la cantidad...", key="f_tg")
@@ -121,7 +118,6 @@ with pestaña_tiendas:
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
         else:
-            # Control seguro para transformar valores vacíos (None) en 0.0 al inyectar a la base de datos
             v_neta_val = venta_neta if venta_neta is not None else 0.0
             v_total_val = venta if venta is not None else 0.0
             v_2025_val = venta_2025 if venta_2025 is not None else 0.0
@@ -151,13 +147,13 @@ with pestaña_tiendas:
                     fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
                     venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
                     venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, 
-                    cancelaciones_obs, estado_alerta
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    cancelaciones_obs, estado_alerta, anotaciones_jefe
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, v_neta_val, v_total_val, v_2025_val,
                 v_entrega_val, v_llevar_val, v_ventana_val, v_come_bebe_val, v_visa_val,
                 v_efectivo_val, v_pluxee_val, v_quebranto_val, v_prosegur_val, v_web_val, v_tgtg_val, v_uber_val, v_glovo_val, v_just_val, 
-                incidencias_texto, alerta
+                incidencias_texto, alerta, ""
             ))
             conn.commit()
             conn.close()
@@ -168,14 +164,15 @@ with pestaña_tiendas:
                 
             time.sleep(1)
             st.rerun()
-
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
+        st.session_state.usuario_activo = ""
 
+    # Sistema de perfiles dobles integrado
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -184,6 +181,13 @@ with pestaña_dueño:
         if st.button("🔓 Entrar al Panel", key="btn_auth", use_container_width=True):
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
                 st.session_state.autenticado = True
+                st.session_state.usuario_activo = "Nataly"
+                st.success("¡Acceso concedido!")
+                time.sleep(0.5)
+                st.rerun()
+            elif input_usuario == st.secrets["CELIA_USER"] and input_password == st.secrets["CELIA_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.session_state.usuario_activo = "CeliayDiana"
                 st.success("¡Acceso concedido!")
                 time.sleep(0.5)
                 st.rerun()
@@ -193,7 +197,7 @@ with pestaña_dueño:
 
     col_header, col_refrescar, col_logout = st.columns(3)
     with col_header:
-        st.subheader("📊 Resumen General de Cierres")
+        st.subheader(f"📊 Resumen General de Cierres ({st.session_state.usuario_activo})")
     with col_refrescar:
         if st.button("🔄 Refrescar Datos", use_container_width=True, key="btn_refrescar_datos_iphone"):
             if "df_original" in st.session_state:
@@ -202,6 +206,7 @@ with pestaña_dueño:
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
+            st.session_state.usuario_activo = ""
             if "df_original" in st.session_state:
                 del st.session_state.df_original
             st.rerun()
@@ -210,7 +215,8 @@ with pestaña_dueño:
         'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
         'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
         'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-        'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'cancelaciones_obs': 'Observaciones', 'estado_alerta': 'Estado'
+        'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'cancelaciones_obs': 'Encargado OBS', 
+        'estado_alerta': 'Estado', 'anotaciones_jefe': 'Observaciones'
     }
 
     if "df_original" not in st.session_state:
@@ -235,10 +241,10 @@ with pestaña_dueño:
                 mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
                 df_recuperado_bd = df_recuperado.rename(columns=mapeo_inverso_bd)
                 
-                columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'cancelaciones_obs', 'estado_alerta']
+                columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'cancelaciones_obs', 'estado_alerta', 'anotaciones_jefe']
                 for col in columnas_db:
                     if col not in df_recuperado_bd.columns:
-                        df_recuperado_bd[col] = "" if col == 'cancelaciones_obs' else 0.0
+                        df_recuperado_bd[col] = "" if col in ['cancelaciones_obs', 'anotaciones_jefe'] else 0.0
                 
                 df_recuperado_bd = df_recuperado_bd[[c for c in columnas_db if c in df_recuperado_bd.columns]]
                 
@@ -318,25 +324,33 @@ with pestaña_dueño:
         st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
         
         cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
+        es_nataly = (st.session_state.usuario_activo == "Nataly")
+        
         configuracion_columnas = {
             "ID": st.column_config.NumberColumn(disabled=True),
             "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
             "Tarjeta": cfg_dinero, "Efectivo": cfg_dinero, "Pluxee": cfg_dinero,
-            "Quebranto": cfg_dinero, "Prosegur": cfg_dinero, "Observaciones": st.column_config.TextColumn(),
-            "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
-            "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
+            "Quebranto": cfg_dinero, "Prosegur": cfg_dinero, 
+            "Encargado OBS": st.column_config.TextColumn(disabled=True),
+            "Observaciones": st.column_config.TextColumn(disabled=not es_nataly), # Control estricto de edición
+            "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS, disabled=not es_nataly),
+            "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"], disabled=not es_nataly),
+            "Fecha": st.column_config.TextColumn(disabled=not es_nataly),
+            "Encargado": st.column_config.TextColumn(disabled=not es_nataly),
+            "Estado": st.column_config.TextColumn(disabled=True)
         }
 
         edited_df = st.data_editor(
             df_filtrado, 
             use_container_width=True, 
             hide_index=True,
-            num_rows="dynamic",
+            num_rows="dynamic" if es_nataly else "fixed",
             column_config=configuracion_columnas,
+            disabled=not es_nataly, # Bloquea la interacción a Celia y Diana de forma íntegra
             key="editor_propietario_definitivo"
         )
 
-        if not edited_df.equals(df_filtrado):
+        if es_nataly and (not edited_df.equals(df_filtrado)):
             st.warning("⚠️ Hay cambios pendientes por confirmar")
             
             if st.button("💾 Guardar cambios", use_container_width=True, type="primary", key="btn_guardar_cambios_modelo_captura"):
@@ -362,13 +376,14 @@ with pestaña_dueño:
                         UPDATE recuadros SET 
                             fecha=?, tienda=?, turno=?, encargado=?, venta_neta=?, venta_total=?, venta_2025=?,
                             venta_visa=?, venta_efectivo=?, venta_pluxee=?, quebranto=?, ingreso_prosegur=?, 
-                            cancelaciones_obs=?, estado_alerta=?
+                            cancelaciones_obs=?, estado_alerta=?, anotaciones_jefe=?
                         WHERE id=?
                     """, (
                         str(fila["Fecha"]), str(fila["Tienda"]), str(fila["Turno"]), str(fila["Encargado"]),
                         float(fila["Venta Neta"]), float(fila["Venta Bruta"]), float(fila["Venta 2025"]),
                         float(fila["Tarjeta"]), float(fila["Efectivo"]), float(fila["Pluxee"]),
-                        v_quebranto, float(fila["Prosegur"]), str(fila["Observaciones"]), n_alerta, id_reg
+                        v_quebranto, float(fila["Prosegur"]), str(fila["Encargado OBS"]), n_alerta, 
+                        str(fila["Observaciones"]), id_reg
                     ))
                 
                 conn.commit()
