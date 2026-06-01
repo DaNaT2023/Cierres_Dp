@@ -114,6 +114,7 @@ with pestaña_tiendas:
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
             with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI..."):
+                texto_respuesta = ""
                 try:
                     imagen_subida.seek(0)
                     bytes_imagen = imagen_subida.read()
@@ -173,40 +174,41 @@ with pestaña_tiendas:
                         ],
                         temperature=0.1
                     )
-                    
                     texto_respuesta = response.choices.message.content.strip()
-                    
-                    # FILTRO DE SEGURIDAD: Validar si Together AI devolvió una página de error HTML
+                except Exception as error_api:
+                    st.error(f"Error en la conexión del motor de Together AI: {error_api}")
+
+                # Procesamiento externo y seguro del texto para evitar errores de anidación
+                if texto_respuesta:
                     if "doctype" in texto_respuesta.lower() or "<html" in texto_respuesta.lower():
-                        st.error("El servidor de la IA está saturado en este momento y devolvió una respuesta inválida. Por favor, pulsa el botón de nuevo para reintentar.")
+                        st.error("El servidor de Together AI está saturado. Por favor, pulsa el botón de nuevo.")
                     else:
-                        # Extraer solo el contenido dentro de llaves JSON si la IA metió texto extra
                         inicio_json = texto_respuesta.find("{")
                         fin_json = texto_respuesta.rfind("}") + 1
                         
                         if inicio_json != -1 and fin_json != 0:
-                            texto_limpio = texto_respuesta[inicio_json:fin_json]
-                            datos = json.loads(texto_limpio)
-                            
-                            fecha_str = datos.get("fecha", "")
-                            st.session_state.fecha_detectada = datetime.date.today()
-                            if len(fecha_str) == 10:
-                                try:
-                                    st.session_state.fecha_detectada = datetime.datetime.strptime(fecha_str, "%d/%m/%Y").date()
-                                except:
-                                    pass
-                                    
-                            if datos.get("tienda") in LISTA_TIENDAS:
-                                st.session_state.tienda_detectada = datos.get("tienda")
+                            try:
+                                datos = json.loads(texto_respuesta[inicio_json:fin_json])
                                 
-                            st.session_state.encargado_detectado = str(datos.get("encargado", ""))
-                            st.session_state.venta_neta_detectada = float(datos.get("venta_neta", 0.0))
-                            st.session_state.venta_detectada = float(datos.get("venta_total", 0.0))
-                            st.session_state.venta_2025_detectada = float(datos.get("venta_2025", 0.0))
-                            st.session_state.venta_entrega_detectada = float(datos.get("venta_entrega", 0.0))
-                            st.session_state.venta_llevar_detectada = float(datos.get("venta_llevar", 0.0))
-                            st.session_state.venta_ventana_detectada = float(datos.get("venta_ventana", 0.0))
-                            st.session_state.venta_come_bebe_detectada = float(datos.get("venta_come_bebe", 0.0))
-                            st.session_state.venta_visa_detectada = float(datos.get("venta_visa", 0.0))
-                            st.session_state.venta_efectivo_detectada = float(datos.get("venta_efectivo", 0.0))
-                            st.session_state.venta_pluxee_detectada = float(datos.get("venta_pluxee", 0.0))
+                                # Procesamiento seguro de fecha
+                                fecha_str = datos.get("fecha", "")
+                                st.session_state.fecha_detectada = datetime.date.today()
+                                if len(fecha_str) == 10:
+                                    try:
+                                        st.session_state.fecha_detectada = datetime.datetime.strptime(fecha_str, "%d/%m/%Y").date()
+                                    except:
+                                        pass
+                                
+                                if datos.get("tienda") in LISTA_TIENDAS:
+                                    st.session_state.tienda_detectada = datos.get("tienda")
+                                    
+                                st.session_state.encargado_detectado = str(datos.get("encargado", ""))
+                                st.session_state.venta_neta_detectada = float(datos.get("venta_neta", 0.0))
+                                st.session_state.venta_detectada = float(datos.get("venta_total", 0.0))
+                                st.session_state.venta_2025_detectada = float(datos.get("venta_2025", 0.0))
+                                st.session_state.venta_entrega_detectada = float(datos.get("venta_entrega", 0.0))
+                                st.session_state.venta_llevar_detectada = float(datos.get("venta_llevar", 0.0))
+                                st.session_state.venta_ventana_detectada = float(datos.get("venta_ventana", 0.0))
+                                st.session_state.venta_come_bebe_detectada = float(datos.get("venta_come_bebe", 0.0))
+                                st.session_state.venta_visa_detectada = float(datos.get("venta_visa", 0.0))
+                                st.session_state.venta_efectivo_detectada = float(datos.get("venta_efectivo", 0.0))
