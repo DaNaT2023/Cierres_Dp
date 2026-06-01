@@ -206,9 +206,15 @@ with pestaña_dueño:
         if df.empty:
             st.info("Aún no se han registrado cierres en la base de datos.")
         else:
+            # PROTECCIÓN: Si el filtro de tiendas está vacío, por defecto selecciona TODAS
             tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+            if not tiendas_filtro:
+                tiendas_filtro = LISTA_TIENDAS
+                
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado:", options=alertas_disponibles, default=alertas_disponibles)
+            if not alertas_filtro:
+                alertas_filtro = alertas_disponibles
             
             df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
             
@@ -216,9 +222,3 @@ with pestaña_dueño:
             m1, m2, m3 = st.columns(3)
             m1.metric("Venta Bruta Total del Grupo", f"{df_filtrado['venta_total'].sum():,.2f} €")
             m2.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
-            m3.metric("Turnos Registrados", len(df_filtrado))
-            
-            st.markdown("---")
-            st.subheader("📋 Histórico de Turnos")
-            
-            # Reordenar y seleccionar TODAS las columnas del histórico en un orden lógico
