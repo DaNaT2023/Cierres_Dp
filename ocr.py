@@ -25,10 +25,6 @@ if "tienda_detectada" not in st.session_state:
     st.session_state.tienda_detectada = "Dp Valdebebas"
 if "encargado_detectado" not in st.session_state:
     st.session_state.encargado_detectado = ""
-if "venta_detectada" not in st.session_state:
-    st.session_state.venta_detectada = 0.0
-if "quebranto_detectado" not in st.session_state:
-    st.session_state.quebranto_detectado = 0.0
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -38,7 +34,8 @@ NUEVOS_CAMPOS = [
     "venta_entrega_detectada", "venta_llevar_detectada", "venta_ventana_detectada", 
     "venta_come_bebe_detectada", "venta_visa_detectada", "venta_efectivo_detectada", 
     "venta_pluxee_detectada", "ingreso_prosegur_detectada", "web_detectada", 
-    "tgtg_detectada", "uber_eats_detectada", "glovo_detectada", "just_eat_detectada"
+    "tgtg_detectada", "uber_eats_detectada", "glovo_detectada", "just_eat_detectada",
+    "quebranto_detectado", "venta_detectada"
 ]
 
 for campo in NUEVOS_CAMPOS:
@@ -127,13 +124,10 @@ with pestaña_tiendas:
                 
                 try:
                     img = Image.open(imagen_subida)
-                    
-                    # Conectar usando el cliente SDK oficial de Google
                     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
                     
                     prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, usando exactamente estas llaves: fecha, tienda, encargado, venta_neta, venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa, venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat"
                     
-                    # Llamada limpia al modelo oficial de visión
                     response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=[img, prompt_ocr],
@@ -166,14 +160,12 @@ with pestaña_tiendas:
                                 except:
                                     pass
                             
-                            # Validar que la tienda coincida
                             tienda_ia = datos_json.get("tienda", "")
                             for t in LISTA_TIENDAS:
                                 if t.lower() in tienda_ia.lower():
                                     st.session_state.tienda_detectada = t
                             
                             st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
-                            st.session_state.bytes_imagen = None
                             st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
                             st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
                             st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
@@ -204,3 +196,9 @@ with pestaña_tiendas:
     if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
         
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
+        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
+        fecha = st.date_input("Fecha del Recuadro", value=st.session_state.fecha_detectada, key="input_fecha_formulario")
