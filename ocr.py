@@ -210,7 +210,7 @@ with pestaña_dueño:
             alertas_disponibles = list(df['estado_alerta'].unique())
             alertas_filtro = st.multiselect("Filtrar por Estado:", options=alertas_disponibles, default=alertas_disponibles)
             
-            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
+            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
             
             st.markdown("### 📈 Métricas")
             m1, m2, m3 = st.columns(3)
@@ -221,4 +221,4 @@ with pestaña_dueño:
             st.markdown("---")
             st.subheader("📋 Histórico de Turnos")
             
-            # LLAMADA ULTRA SEGURA Y PLANA SIN CONFIGURACIONES DE PARÉNTESIS COMPLEJOS
+            # Reordenar y seleccionar TODAS las columnas del histórico en un orden lógico
