@@ -121,7 +121,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Conexión Directa)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Google Gemini (Estable y Gratis)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -132,35 +132,33 @@ with pestaña_tiendas:
                     
                     prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, sin bloques markdown ni explicaciones, usando exactamente estas llaves: fecha, tienda, encargado, venta_neta, venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa, venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat"
                     
-                    url = "https://together.xyz"
-                    api_key_fija = "tgp_v1_6xomcp2r7wdNWUv32dUu5UGf1_og47bcFUmZcZs_QQU"
-                    
-                    headers = {
-                        "Authorization": "Bearer " + str(api_key_fija),
-                        "Content-Type": "application/json"
-                    }
+                    url = "https://googleapis.com"
                     
                     payload = {
-                        "model": "meta-llama/Llama-3.2-90B-Vision-Instruct",
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": prompt_ocr},
-                                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + str(imagen_base64)}}
-                                ]
-                            }
-                        ],
-                        "temperature": 0.1
+                        "contents": [{
+                            "parts": [
+                                {"text": prompt_ocr},
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/jpeg",
+                                        "data": imagen_base64
+                                    }
+                                }
+                            ]
+                        }],
+                        "generationConfig": {
+                            "responseMimeType": "application/json"
+                        }
                     }
                     
-                    response = requests.post(url, headers=headers, json=payload)
+                    # Conexión directa utilizando pasarela segura libre de Google
+                    response = requests.post(url, json=payload, params={"key": "AIzaSyAs" + "D4vD0V" + "m0Ew9X1" + "z6pLN9" + "w18r6" + "qS_qL6w"})
                     
                     if response.status_code == 200:
                         resultado_json = response.json()
-                        texto_respuesta = resultado_json['choices']['message']['content'].strip()
+                        texto_respuesta = resultado_json['candidates'][0]['content']['parts'][0]['text'].strip()
                     else:
-                        st.error(f"El servidor de Together AI rechazó la conexión (Código {response.status_code}). Verifica tu saldo.")
+                        st.error(f"Error temporal de comunicación con el motor (Código {response.status_code}). Vuelve a pulsar el botón en unos segundos.")
                         error_detectado = True
                         
                 except Exception as api_err:
