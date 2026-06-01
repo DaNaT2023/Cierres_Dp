@@ -22,7 +22,8 @@ def inicializar_bd():
             id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tienda TEXT, turno TEXT, encargado TEXT,
             venta_neta REAL, venta_total REAL, venta_2025 REAL, venta_entrega REAL, venta_llevar REAL,
             venta_ventana REAL, venta_come_bebe REAL, venta_visa REAL, venta_efectivo REAL, venta_pluxee REAL,
-            quebranto REAL, ingreso_prosegur REAL, web REAL, tgtg REAL, uber_eats REAL, glovo REAL, just_eat REAL, estado_alerta TEXT
+            quebranto REAL, ingreso_prosegur REAL, web REAL, tgtg REAL, uber_eats REAL, glovo REAL, just_eat REAL, 
+            cancelaciones_obs TEXT, estado_alerta TEXT
         )
     """)
     conexion.commit()
@@ -33,7 +34,8 @@ inicializar_bd()
 # ==========================================
 # 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
-st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
+# CAMBIO: Título de página acortado
+st.set_page_config(page_title="Cierre Diario DP", layout="wide")
 
 def obtener_logo_base64(ruta_imagen):
     try:
@@ -44,18 +46,19 @@ def obtener_logo_base64(ruta_imagen):
 
 logo_codificado = obtener_logo_base64("logo.png")
 
+# CAMBIO: Cabecera visual de la app actualizada a "Cierre Diario DP"
 if logo_codificado:
     st.markdown(
         f"""
         <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 15px; margin-top: -15px;">
             <img src="data:image/png;base64,{logo_codificado}" width="65" style="object-fit: contain; border-radius: 4px;">
-            <h1 style="margin: 0; padding: 0; font-size: 2.3rem; font-weight: 700; color: #31333F;">Panel Cierre Diario Dp</h1>
+            <h1 style="margin: 0; padding: 0; font-size: 2.3rem; font-weight: 700; color: #31333F;">Cierre Diario DP</h1>
         </div>
         """,
         unsafe_allow_html=True
     )
 else:
-    st.title("🍕 Panel Cierre Diario Dp")
+    st.title("🍕 Cierre Diario DP")
 
 st.markdown("---")
 
@@ -65,7 +68,8 @@ pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ 
 # SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
 with pestaña_tiendas:
-    st.header("📝 Formulario Manual Cierre de Turno")
+    # CAMBIO: Título simplificado de la sección
+    st.header("📝 Cierre de Turno")
     turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="sel_turno")
     st.markdown("---")
     
@@ -75,39 +79,70 @@ with pestaña_tiendas:
         tienda = st.selectbox("Tienda", LISTA_TIENDAS, key="f_tienda")
         encargado = st.text_input("Nombre del Encargado", placeholder="Escribe tu nombre", key="f_enc")
         fecha = st.date_input("Fecha del Cierre", value=datetime.date.today(), key="f_fecha")
+        
+        # CAMBIO: value=None para eliminar el "0.0" inicial y placeholder limpio
         st.subheader("💰 Totales Caja")
-        venta_neta = st.number_input("Venta Neta (€)", min_value=0.0, step=10.0, key="f_vn")
-        venta = st.number_input("Venta Total / Bruta (€)", min_value=0.0, step=10.0, key="f_vt")
-        venta_2025 = st.number_input("Venta 2025 (€)", min_value=0.0, step=10.0, key="f_v25")
+        venta_neta = st.number_input("Venta Neta (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vn")
+        venta = st.number_input("Venta Total / Bruta (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vt")
+        venta_2025 = st.number_input("Venta 2025 (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_v25")
+        
+        # CAMBIO: Nuevo grupo de incidencias de texto debajo de Totales Caja
+        st.subheader("💬 Cancelaciones y observaciones")
+        incidencias_texto = st.text_area("Escribe aquí cualquier incidencia o comentario del turno:", placeholder="Ej. Cancelación de pedido por retraso, descuadre de moto...", key="f_obs")
+
     with col2:
-        st.subheader("🛵 Desglose Canales")
-        venta_entrega = st.number_input("Venta Entrega (€)", min_value=0.0, step=10.0, key="f_ve")
-        venta_llevar = st.number_input("Venta Llevar (€)", min_value=0.0, step=10.0, key="f_vll")
-        venta_ventana = st.number_input("Venta Ventana (€)", min_value=0.0, step=10.0, key="f_vv")
-        venta_come_bebe = st.number_input("Venta Come & Bebe / Sala (€)", min_value=0.0, step=10.0, key="f_vcb")
+        # CAMBIO: Título corregido ortográficamente a "Desglose de Canales" y value=None
+        st.subheader("🛵 Desglose de Canales")
+        venta_entrega = st.number_input("Venta Entrega (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_ve")
+        venta_llevar = st.number_input("Venta Llevar (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vll")
+        venta_ventana = st.number_input("Venta Ventana (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vv")
+        venta_come_bebe = st.number_input("Venta Come & Bebe / Sala (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vcb")
+        
         st.subheader("💳 Métodos de Pago")
-        venta_visa = st.number_input("Venta VISA / Tarjeta (€)", min_value=0.0, step=10.0, key="f_vvi")
-        venta_efectivo = st.number_input("Venta en Efectivo (€)", min_value=0.0, step=10.0, key="f_vef")
+        venta_visa = st.number_input("Venta VISA / Tarjeta (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vvi")
+        venta_efectivo = st.number_input("Venta en Efectivo (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vef")
     with col3:
+        # CAMBIO: value=None en descuadres
         st.subheader("📉 Descuadres")
-        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, step=10.0, key="f_vp")
-        quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", value=0.0, step=5.0, key="f_q")
-        ingresado_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, step=10.0, key="f_pro")
+        quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", step=5.0, value=None, placeholder="Escribe la cantidad...", key="f_q")
+        ingresado_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_pro")
+        
         st.subheader("🌐 Agregadores y Online")
-        web = st.number_input("Web (€)", min_value=0.0, step=10.0, key="f_web")
-        tgtg = st.number_input("TGTG (€)", min_value=0.0, step=5.0, key="f_tg")
-        uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, step=10.0, key="f_ub")
-        glovo = st.number_input("Glovo (€)", min_value=0.0, step=10.0, key="f_gl")
-        just_eat = st.number_input("Just Eat (€)", min_value=0.0, step=10.0, key="f_je")
+        # CAMBIO: Pluxee Gourmet reubicado en este grupo y con value=None
+        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_vp")
+        web = st.number_input("Web (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_web")
+        tgtg = st.number_input("TGTG (€)", min_value=0.0, step=5.0, value=None, placeholder="Escribe la cantidad...", key="f_tg")
+        uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_ub")
+        glovo = st.number_input("Glovo (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_gl")
+        just_eat = st.number_input("Just Eat (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_je")
 
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar", use_container_width=True):
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
         else:
+            # Control seguro para transformar valores vacíos (None) en 0.0 al inyectar a la base de datos
+            v_neta_val = venta_neta if venta_neta is not None else 0.0
+            v_total_val = venta if venta is not None else 0.0
+            v_2025_val = venta_2025 if venta_2025 is not None else 0.0
+            v_entrega_val = venta_entrega if venta_entrega is not None else 0.0
+            v_llevar_val = venta_llevar if venta_llevar is not None else 0.0
+            v_ventana_val = venta_ventana if venta_ventana is not None else 0.0
+            v_come_bebe_val = venta_come_bebe if venta_come_bebe is not None else 0.0
+            v_visa_val = venta_visa if venta_visa is not None else 0.0
+            v_efectivo_val = venta_efectivo if venta_efectivo is not None else 0.0
+            v_pluxee_val = venta_pluxee if venta_pluxee is not None else 0.0
+            v_quebranto_val = quebranto if quebranto is not None else 0.0
+            v_prosegur_val = ingresado_prosegur if ingresado_prosegur is not None else 0.0
+            v_web_val = web if web is not None else 0.0
+            v_tgtg_val = tgtg if tgtg is not None else 0.0
+            v_uber_val = uber_eats if uber_eats is not None else 0.0
+            v_glovo_val = glovo if glovo is not None else 0.0
+            v_just_val = just_eat if just_eat is not None else 0.0
+            
             alerta = "OK"
-            if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
-            elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
+            if v_quebranto_val <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
+            elif v_quebranto_val >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
                 
             conn = sqlite3.connect("tiendas.db")
             cursor = conn.cursor()
@@ -115,12 +150,14 @@ with pestaña_tiendas:
                 INSERT INTO recuadros (
                     fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
                     venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, estado_alerta
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat, 
+                    cancelaciones_obs, estado_alerta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
-                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                venta_efectivo, venta_pluxee, quebranto, ingresado_prosegur, web, tgtg, uber_eats, glovo, just_eat, alerta
+                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, v_neta_val, v_total_val, v_2025_val,
+                v_entrega_val, v_llevar_val, v_ventana_val, v_come_bebe_val, v_visa_val,
+                v_efectivo_val, v_pluxee_val, v_quebranto_val, v_prosegur_val, v_web_val, v_tgtg_val, v_uber_val, v_glovo_val, v_just_val, 
+                incidencias_texto, alerta
             ))
             conn.commit()
             conn.close()
@@ -131,6 +168,7 @@ with pestaña_tiendas:
                 
             time.sleep(1)
             st.rerun()
+
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
 # ------------------------------------------
@@ -153,12 +191,10 @@ with pestaña_dueño:
                 st.error("Usuario o contraseña incorrectos.")
         st.stop()
 
-    # CABECERA NUEVA CON TRES COLUMNAS: Título, Botón de Refrescar y Botón de Salir
     col_header, col_refrescar, col_logout = st.columns(3)
     with col_header:
         st.subheader("📊 Resumen General de Cierres")
     with col_refrescar:
-        # Botón nativo para obligar al iPhone a borrar la memoria caché y refrescar los datos
         if st.button("🔄 Refrescar Datos", use_container_width=True, key="btn_refrescar_datos_iphone"):
             if "df_original" in st.session_state:
                 del st.session_state.df_original
@@ -174,7 +210,7 @@ with pestaña_dueño:
         'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
         'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
         'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-        'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
+        'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'cancelaciones_obs': 'Observaciones', 'estado_alerta': 'Estado'
     }
 
     if "df_original" not in st.session_state:
@@ -199,10 +235,10 @@ with pestaña_dueño:
                 mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
                 df_recuperado_bd = df_recuperado.rename(columns=mapeo_inverso_bd)
                 
-                columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'estado_alerta']
+                columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'cancelaciones_obs', 'estado_alerta']
                 for col in columnas_db:
                     if col not in df_recuperado_bd.columns:
-                        df_recuperado_bd[col] = 0.0
+                        df_recuperado_bd[col] = "" if col == 'cancelaciones_obs' else 0.0
                 
                 df_recuperado_bd = df_recuperado_bd[[c for c in columnas_db if c in df_recuperado_bd.columns]]
                 
@@ -286,7 +322,7 @@ with pestaña_dueño:
             "ID": st.column_config.NumberColumn(disabled=True),
             "Venta Neta": cfg_dinero, "Venta Bruta": cfg_dinero, "Venta 2025": cfg_dinero,
             "Tarjeta": cfg_dinero, "Efectivo": cfg_dinero, "Pluxee": cfg_dinero,
-            "Quebranto": cfg_dinero, "Prosegur": cfg_dinero,
+            "Quebranto": cfg_dinero, "Prosegur": cfg_dinero, "Observaciones": st.column_config.TextColumn(),
             "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
             "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
         }
@@ -325,13 +361,14 @@ with pestaña_dueño:
                     cursor.execute("""
                         UPDATE recuadros SET 
                             fecha=?, tienda=?, turno=?, encargado=?, venta_neta=?, venta_total=?, venta_2025=?,
-                            venta_visa=?, venta_efectivo=?, venta_pluxee=?, quebranto=?, ingreso_prosegur=?, estado_alerta=?
+                            venta_visa=?, venta_efectivo=?, venta_pluxee=?, quebranto=?, ingreso_prosegur=?, 
+                            cancelaciones_obs=?, estado_alerta=?
                         WHERE id=?
                     """, (
                         str(fila["Fecha"]), str(fila["Tienda"]), str(fila["Turno"]), str(fila["Encargado"]),
                         float(fila["Venta Neta"]), float(fila["Venta Bruta"]), float(fila["Venta 2025"]),
                         float(fila["Tarjeta"]), float(fila["Efectivo"]), float(fila["Pluxee"]),
-                        v_quebranto, float(fila["Prosegur"]), n_alerta, id_reg
+                        v_quebranto, float(fila["Prosegur"]), str(fila["Observaciones"]), n_alerta, id_reg
                     ))
                 
                 conn.commit()
