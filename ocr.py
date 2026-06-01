@@ -19,11 +19,12 @@ LISTA_TIENDAS = [
 ]
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL
+# 1. BASE DE DATOS LOCAL ACTUALIZADA AL 100%
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
     cursor = conexion.cursor()
+    # Creamos la tabla con todos los campos reales de tu imagen
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS recuadros (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,6 +32,8 @@ def inicializar_bd():
             tienda TEXT,
             turno TEXT,
             encargado TEXT,
+            total_pedidos INTEGER,
+            deliverys INTEGER,
             venta_neta REAL,
             venta_total REAL,
             venta_2025 REAL,
@@ -40,14 +43,19 @@ def inicializar_bd():
             venta_come_bebe REAL,
             venta_visa REAL,
             venta_efectivo REAL,
-            venta_pluxee REAL,
             quebranto REAL,
             ingreso_prosegur REAL,
+            produccion_real REAL,
+            espera_rack TEXT,
+            media_reparto TEXT,
+            pedidos_mas_45 INTEGER,
+            pedidos_mas_10_min INTEGER,
             web REAL,
             tgtg REAL,
             uber_eats REAL,
             glovo REAL,
             just_eat REAL,
+            cancelados_motivo TEXT,
             estado_alerta TEXT
         )
     """)
@@ -94,7 +102,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (MANUAL RÁPIDO)
+# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO REAL COMPLETO)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -110,7 +118,12 @@ with pestaña_tiendas:
         encargado = st.text_input("Nombre del Encargado", placeholder="Escribe tu nombre", key="input_encargado_formulario")
         fecha = st.date_input("Fecha del Cierre", value=datetime.date.today(), key="input_fecha_formulario")
         
-        st.subheader("💰 Totales Caja")
+        st.subheader("📊 Métricas Operativas")
+        total_pedidos = st.number_input("Total Pedidos", min_value=0, value=0, step=1, key="input_tp_formulario")
+        deliverys = st.number_input("Deliverys", min_value=0, value=0, step=1, key="input_del_formulario")
+        produccion_real = st.number_input("Producción Real (€)", min_value=0.0, value=0.0, step=10.0, key="input_pr_formulario")
+        
+        st.subheader("💰 Totales de Caja")
         venta_neta = st.number_input("Venta Neta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vn_formulario")
         venta = st.number_input("Venta Total / Bruta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vt_formulario")
         venta_2025 = st.number_input("Venta 2025 (€)", min_value=0.0, value=0.0, step=10.0, key="input_v25_formulario")
@@ -120,24 +133,31 @@ with pestaña_tiendas:
         venta_entrega = st.number_input("Venta Entrega (€)", min_value=0.0, value=0.0, step=10.0, key="input_ve_formulario")
         venta_llevar = st.number_input("Venta Llevar (€)", min_value=0.0, value=0.0, step=10.0, key="input_vll_formulario")
         venta_ventana = st.number_input("Venta Ventana (€)", min_value=0.0, value=0.0, step=10.0, key="input_vv_formulario")
-        venta_come_bebe = st.number_input("Venta Come & Bebe / Sala (€)", min_value=0.0, value=0.0, step=10.0, key="input_vcb_formulario")
+        venta_come_bebe = st.number_input("Venta Come & Bebe (€)", min_value=0.0, value=0.0, step=10.0, key="input_vcb_formulario")
         
         st.subheader("💳 Métodos de Pago")
         venta_visa = st.number_input("Venta VISA / Tarjeta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vvi_formulario")
         venta_efectivo = st.number_input("Venta en Efectivo (€)", min_value=0.0, value=0.0, step=10.0, key="input_vef_formulario")
+        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, value=0.0, step=10.0, key="input_vp_formulario")
 
     with col3:
-        st.subheader("📉 Descuadres")
-        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, value=0.0, step=10.0, key="input_vp_formulario")
+        st.subheader("⏱️ Tiempos y Alertas")
+        espera_rack = st.text_input("Espera Rack (Ej. 3:45)", value="0:00", key="input_rack_formulario")
+        media_reparto = st.text_input("Media Reparto (Ej. 22:15)", value="0:00", key="input_reparto_formulario")
+        pedidos_mas_45 = st.number_input("Pedidos +45%", min_value=0, value=0, step=1, key="input_p45_formulario")
+        pedidos_mas_10_min = st.number_input("Pedidos > 10 min", min_value=0, value=0, step=1, key="input_p10_formulario")
+        
+        st.subheader("📉 Descuadres y Canales Online")
         quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", value=0.0, step=5.0, key="input_quebranto_formulario")
         ingreso_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, value=0.0, step=10.0, key="input_pro_formulario")
-        
-        st.subheader("🌐 Agregadores y Online")
         web = st.number_input("Web (€)", min_value=0.0, value=0.0, step=10.0, key="input_web_formulario")
         tgtg = st.number_input("TGTG (€)", min_value=0.0, value=0.0, step=5.0, key="input_tgtg_formulario")
         uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, value=0.0, step=10.0, key="input_uber_formulario")
         glovo = st.number_input("Glovo (€)", min_value=0.0, value=0.0, step=10.0, key="input_glovo_formulario")
         just_eat = st.number_input("Just Eat (€)", min_value=0.0, value=0.0, step=10.0, key="input_je_formulario")
+        
+        st.subheader("🚨 Incidencias")
+        cancelados_motivo = st.text_area("Cancelados - Motivo", placeholder="Escribe aquí los pedidos cancelados y su motivo...", key="input_cancelados_formulario")
 
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
@@ -154,16 +174,17 @@ with pestaña_tiendas:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO recuadros (
-                    fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
-                    venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg,
-                    uber_eats, glovo, just_eat, estado_alerta
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    fecha, tienda, turno, encargado, total_pedidos, deliverys, venta_neta, 
+                    venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, 
+                    venta_come_bebe, venta_visa, venta_efectivo, quebranto, ingreso_prosegur, 
+                    produccion_real, espera_rack, media_reparto, pedidos_mas_45, pedidos_mas_10_min, 
+                    web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, estado_alerta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
-                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
-                venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg,
-                uber_eats, glovo, just_eat, alerta
+                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, total_pedidos, deliverys, venta_neta,
+                venta, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                venta_efectivo, quebranto, ingreso_prosegur, produccion_real, espera_rack, media_reparto,
+                pedidos_mas_45, pedidos_mas_10_min, web, tgtg, uber_eats, glovo, just_eat, cancelados_motivo, alerta
             ))
             conn.commit()
             conn.close()
@@ -173,7 +194,7 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTILO NATIVO PURO COMPLETO)
 # ------------------------------------------
 with pestaña_dueño:
     if "autenticado" not in st.session_state:
@@ -186,39 +207,3 @@ with pestaña_dueño:
         
         if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
             if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.success("¡Acceso concedido!")
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
-    else:
-        if st.button("🔒 Cerrar Sesión", key="btn_cerrar_sesion_propietario"):
-            st.session_state.autenticado = False
-            st.rerun()
-            
-        st.markdown("---")
-        st.subheader("📊 Resumen General de Cierres")
-        
-        conn = sqlite3.connect("tiendas.db")
-        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-        conn.close()
-        
-        if df.empty:
-            st.info("Aún no se han registrado cierres en la base de datos.")
-        else:
-            # PROTECCIÓN: Si el filtro de tiendas está vacío, por defecto selecciona TODAS
-            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-            if not tiendas_filtro:
-                tiendas_filtro = LISTA_TIENDAS
-                
-            alertas_disponibles = list(df['estado_alerta'].unique())
-            alertas_filtro = st.multiselect("Filtrar por Estado:", options=alertas_disponibles, default=alertas_disponibles)
-            if not alertas_filtro:
-                alertas_filtro = alertas_disponibles
-            
-            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
-            
-            st.markdown("### 📈 Métricas")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Venta Bruta Total del Grupo", f"{df_filtrado['venta_total'].sum():,.2f} €")
-            m2.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
