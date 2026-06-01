@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import time
 import base64
+import io
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -22,7 +23,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL CON ESTRUCTURA EXACTA HORIZONTAL (29 CAMPOS)
+# 1. BASE DE DATOS LOCAL CON TU ESTRUCTURA REAL (29 CAMPOS)
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("pizzerias_final.db")
@@ -104,7 +105,7 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS (FORMULARIO MANUAL ENTRADA)
+# SECCIÓN 1: FORMULARIO DE ENVÍO PARA ENCARGADOS (MANTENIDO PERFECTO)
 # ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Formulario Manual Cierre de Turno")
@@ -189,19 +190,20 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA PLANA CORREGIDA ANTIMAPAS)
+# SECCIÓN 2: PANEL DEL PROPIETARIO (NUEVA LÓGICA DE PESTAÑAS SUB-TEMÁTICAS MULTIDIMENSIONAL)
 # ------------------------------------------
 with pestaña_dueño:
     st.subheader("🔒 Panel de Control del Administrador")
     clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
     
-    # Detención lineal plana directa para limpiar el error 207 por completo
+    # Detención lineal plana directa segura
     if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
         if clave_ingresada != "":
             st.error("⚠️ La contraseña introducida no es correcta.")
-        st.warning("Introduce las credenciales arriba para activar el histórico horizontal.")
+        st.warning("Introduce las credenciales arriba para activar el histórico estructurado.")
     else:
-        st.success("🔓 Concedido acceso completo al histórico horizontal.")
+        st.success("🔓 Concedido acceso completo al histórico.")
         st.markdown("---")
         
+        # Conexión directa a la base de datos
         conn = sqlite3.connect("pizzerias_final.db")
