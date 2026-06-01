@@ -166,7 +166,6 @@ with pestaña_tiendas:
                                     st.session_state.tienda_detectada = t
                             
                             st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
-                            st.session_state.bytes_imagen = None
                             st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
                             st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
                             st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
@@ -197,6 +196,7 @@ with pestaña_tiendas:
     if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
         
+    # ESTRUCTURA DE 3 COLUMNÁSTRAS INDEPENDIENTES CORREGIDA
     col1, col2, col3 = st.columns(3)
     
     with col1:
