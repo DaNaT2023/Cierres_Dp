@@ -3,10 +3,6 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-import base64
-import json
-from google import genai
-from PIL import Image
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -19,39 +15,6 @@ LISTA_TIENDAS = [
     "Dp Galapagar",
     "Dp Vicálvaro"
 ]
-
-# Inicializar variables en el estado de la sesión
-if "tienda_detectada" not in st.session_state:
-    st.session_state.tienda_detectada = "Dp Valdebebas"
-if "encargado_detectado" not in st.session_state:
-    st.session_state.encargado_detectado = ""
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-
-# Inicializar nuevas variables financieras en el estado de la sesión
-NUEVOS_CAMPOS = [
-    "fecha_detectada", "venta_neta_detectada", "venta_2025_detectada", 
-    "venta_entrega_detectada", "venta_llevar_detectada", "venta_ventana_detectada", 
-    "venta_come_bebe_detectada", "venta_visa_detectada", "venta_efectivo_detectada", 
-    "venta_pluxee_detectada", "ingreso_prosegur_detectada", "web_detectada", 
-    "tgtg_detectada", "uber_eats_detectada", "glovo_detectada", "just_eat_detectada",
-    "quebranto_detectado", "venta_detectada"
-]
-
-for campo in NUEVOS_CAMPOS:
-    if campo not in st.session_state:
-        if "fecha" in campo:
-            st.session_state[campo] = datetime.date.today()
-        else:
-            st.session_state[campo] = 0.0
-
-def convertir_a_float(valor):
-    if valor is None:
-        return 0.0
-    try:
-        return float(valor)
-    except:
-        return 0.0
 
 # ==========================================
 # 1. BASE DE DATOS LOCAL
@@ -102,104 +65,150 @@ st.markdown("---")
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
 # ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS
+# SECCIÓN: ENVÍO DE TIENDAS (MANUAL RÁPIDO)
 # ------------------------------------------
 with pestaña_tiendas:
-    st.header("Formulario de Cierre de Turno")
+    st.header("📝 Formulario Manual Cierre de Turno")
     
     col_pre1, col_pre2 = st.columns(2)
     with col_pre1:
-        turno_seleccionado = st.radio("¿Qué turno vas a subir?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
+        turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     
-    st.subheader("📸 Subir Recuadro Diario")
-    imagen_subida = st.file_uploader("Selecciona la foto del recuadro", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
-    
-    if imagen_subida is not None:
-        st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
-        
-        if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Google Gemini..."):
-                texto_respuesta = ""
-                error_detectado = False
-                
-                try:
-                    img = Image.open(imagen_subida)
-                    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-                    
-                    prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, usando exactamente estas llaves: fecha, tienda, encargado, venta_neta, venta_total, venta_2025, venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa, venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg, uber_eats, glovo, just_eat"
-                    
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=[img, prompt_ocr],
-                        config={"response_mime_type": "application/json"}
-                    )
-                    texto_respuesta = response.text.strip()
-                        
-                except Exception as api_err:
-                    st.error(f"Error con Gemini: {api_err}")
-                    error_detectado = True
-
-                # PROCESAMIENTO LINEAL
-                if not error_detectado and texto_respuesta:
-                    inicio_json = texto_respuesta.find("{")
-                    fin_json = texto_respuesta.rfind("}") + 1
-                    
-                    if inicio_json != -1 and fin_json != 0:
-                        datos_json = None
-                        try:
-                            datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
-                        except:
-                            st.error("Error al estructurar JSON.")
-                        
-                        if datos_json is not None:
-                            f_str = datos_json.get("fecha", "")
-                            st.session_state.fecha_detectada = datetime.date.today()
-                            if len(f_str) == 10:
-                                try:
-                                    st.session_state.fecha_detectada = datetime.datetime.strptime(f_str, "%d/%m/%Y").date()
-                                except:
-                                    pass
-                            
-                            tienda_ia = datos_json.get("tienda", "")
-                            for t in LISTA_TIENDAS:
-                                if t.lower() in tienda_ia.lower():
-                                    st.session_state.tienda_detectada = t
-                            
-                            st.session_state.encargado_detectado = str(datos_json.get("encargado", ""))
-                            st.session_state.venta_neta_detectada = convertir_a_float(datos_json.get("venta_neta"))
-                            st.session_state.venta_detectada = convertir_a_float(datos_json.get("venta_total"))
-                            st.session_state.venta_2025_detectada = convertir_a_float(datos_json.get("venta_2025"))
-                            st.session_state.venta_entrega_detectada = convertir_a_float(datos_json.get("venta_entrega"))
-                            st.session_state.venta_llevar_detectada = convertir_a_float(datos_json.get("venta_llevar"))
-                            st.session_state.venta_ventana_detectada = convertir_a_float(datos_json.get("venta_ventana"))
-                            st.session_state.venta_come_bebe_detectada = convertir_a_float(datos_json.get("venta_come_bebe"))
-                            st.session_state.venta_visa_detectada = convertir_a_float(datos_json.get("venta_visa"))
-                            st.session_state.venta_efectivo_detectada = convertir_a_float(datos_json.get("venta_efectivo"))
-                            st.session_state.venta_pluxee_detectada = convertir_a_float(datos_json.get("venta_pluxee"))
-                            st.session_state.quebranto_detectado = convertir_a_float(datos_json.get("quebranto"))
-                            st.session_state.ingreso_prosegur_detectada = convertir_a_float(datos_json.get("ingreso_prosegur"))
-                            st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
-                            st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
-                            st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
-                            st.session_state.glovo_detectada = convertir_a_float(datos_json.get("glovo"))
-                            st.session_state.just_eat_detectada = convertir_a_float(datos_json.get("just_eat"))
-                            
-                            st.success("¡Datos cargados con éxito!")
-                            st.rerun()
-                    else:
-                        st.error("Formato no válido.")
-
     st.markdown("---")
-    st.subheader("📝 Confirmar Datos del Formulario")
     
-    tienda_idx = 0
-    if st.session_state.tienda_detectada in LISTA_TIENDAS:
-        tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
-        
+    # Formulario compacto de 3 columnas adaptado a pantallas de móviles
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        tienda = st.selectbox("Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
-        encargado = st.text_input("Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
-        fecha = st.date_input("Fecha", value=st.session_state.fecha_detectada, key="input_fecha_formulario")
-        venta_neta = st.number_input("Venta Neta (€)", value=st.session_state.venta_neta_detectada, step=10.0, key="input_vn_formulario")
+        st.subheader("📌 Datos del Turno")
+        tienda = st.selectbox("Tienda", LISTA_TIENDAS, key="combo_tiendas_formulario")
+        encargado = st.text_input("Nombre del Encargado", placeholder="Escribe tu nombre", key="input_encargado_formulario")
+        fecha = st.date_input("Fecha del Cierre", value=datetime.date.today(), key="input_fecha_formulario")
+        
+        st.subheader("💰 Totales Caja")
+        venta_neta = st.number_input("Venta Neta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vn_formulario")
+        venta = st.number_input("Venta Total / Bruta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vt_formulario")
+        venta_2025 = st.number_input("Venta 2025 (€)", min_value=0.0, value=0.0, step=10.0, key="input_v25_formulario")
+
+    with col2:
+        st.subheader("🛵 Desglose Canales")
+        venta_entrega = st.number_input("Venta Entrega (€)", min_value=0.0, value=0.0, step=10.0, key="input_ve_formulario")
+        venta_llevar = st.number_input("Venta Llevar (€)", min_value=0.0, value=0.0, step=10.0, key="input_vll_formulario")
+        venta_ventana = st.number_input("Venta Ventana (€)", min_value=0.0, value=0.0, step=10.0, key="input_vv_formulario")
+        venta_come_bebe = st.number_input("Venta Come & Bebe / Sala (€)", min_value=0.0, value=0.0, step=10.0, key="input_vcb_formulario")
+        
+        st.subheader("💳 Métodos de Pago")
+        venta_visa = st.number_input("Venta VISA / Tarjeta (€)", min_value=0.0, value=0.0, step=10.0, key="input_vvi_formulario")
+        venta_efectivo = st.number_input("Venta en Efectivo (€)", min_value=0.0, value=0.0, step=10.0, key="input_vef_formulario")
+
+    with col3:
+        st.subheader("📉 Descuadres")
+        venta_pluxee = st.number_input("Pluxee Gourmet (€)", min_value=0.0, value=0.0, step=10.0, key="input_vp_formulario")
+        quebranto = st.number_input("Quebranto (€) [Usa - para pérdidas]", value=0.0, step=5.0, key="input_quebranto_formulario")
+        ingreso_prosegur = st.number_input("Ingreso Prosegur (€)", min_value=0.0, value=0.0, step=10.0, key="input_pro_formulario")
+        
+        st.subheader("🌐 Agregadores y Online")
+        web = st.number_input("Web (€)", min_value=0.0, value=0.0, step=10.0, key="input_web_formulario")
+        tgtg = st.number_input("TGTG (€)", min_value=0.0, value=0.0, step=5.0, key="input_tgtg_formulario")
+        uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, value=0.0, step=10.0, key="input_uber_formulario")
+        glovo = st.number_input("Glovo (€)", min_value=0.0, value=0.0, step=10.0, key="input_glovo_formulario")
+        just_eat = st.number_input("Just Eat (€)", min_value=0.0, value=0.0, step=10.0, key="input_je_formulario")
+
+    st.markdown("---")
+    if st.button("🚀 Guardar Registro del Turno", key="btn_guardar_registro_bd", use_container_width=True):
+        if encargado.strip() == "":
+            st.error("Por favor, introduce el nombre del encargado para poder guardar el cierre.")
+        else:
+            alerta = "OK"
+            if quebranto <= -100:
+                alerta = "🚨 CRÍTICO (Pérdida)"
+            elif quebranto >= 100:
+                alerta = "⚠️ ATENCIÓN (Exceso)"
+                
+            conn = sqlite3.connect("tiendas.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO recuadros (
+                    fecha, tienda, turno, encargado, venta_neta, venta_total, venta_2025,
+                    venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                    venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg,
+                    uber_eats, glovo, just_eat, estado_alerta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, venta_neta, venta, venta_2025,
+                venta_entrega, venta_llevar, venta_ventana, venta_come_bebe, venta_visa,
+                venta_efectivo, venta_pluxee, quebranto, ingreso_prosegur, web, tgtg,
+                uber_eats, glovo, just_eat, alerta
+            ))
+            conn.commit()
+            conn.close()
+            
+            st.success(f"¡El cierre de {tienda} ({turno_seleccionado}) se ha guardado correctamente en la base de datos!")
+            time.sleep(1)
+            st.rerun()
+
+# ------------------------------------------
+# SECCIÓN: PANEL DEL PROPIETARIO
+# ------------------------------------------
+with pestaña_dueño:
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido")
+        input_usuario = st.text_input("Usuario", key="login_user_propietario")
+        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
+        
+        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
+            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.success("¡Acceso concedido!")
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
+    else:
+        if st.button("🔒 Cerrar Sesión", key="btn_cerrar_sesion_propietario"):
+            st.session_state.autenticado = False
+            st.rerun()
+            
+        st.markdown("---")
+        st.subheader("📊 Resumen General de Cierres")
+        
+        conn = sqlite3.connect("tiendas.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
+        
+        if df.empty:
+            st.info("Aún no se han registrado cierres en la base de datos.")
+        else:
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+            with col_f2:
+                alertas_disponibles = list(df['estado_alerta'].unique())
+                alertas_filtro = st.multiselect("Filtrar por Estado/Alerta:", options=alertas_disponibles, default=alertas_disponibles)
+            
+            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)]
+            
+            st.markdown("### 📈 Métricas")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            m2.metric("Balance Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            m3.metric("Turnos Registrados", len(df_filtrado))
+            
+            st.markdown("---")
+            st.subheader("📋 Histórico de Turnos")
+            
+            st.dataframe(
+                df_filtrado,
+                column_config={
+                    "id": None,
+                    "fecha": "Fecha",
+                    "tienda": "Tienda",
+                    "turno": "Turno",
+                    "encargado": "Encargado",
+                    "venta_neta": st.column_config.NumberColumn("Venta Neta", format="%.2f €"),
+                    "venta_total": st.column_config.NumberColumn("Venta Bruta", format="%.2f €"),
+                    "venta_2025": st.column_config.NumberColumn("Venta 2025", format="%.2f €"),
+                    "venta_entrega": st.column_config.NumberColumn("Entrega", format="%.2f €"),
+                    "venta_llevar": st.column_config.NumberColumn("Llevar", format="%.2f €"),
