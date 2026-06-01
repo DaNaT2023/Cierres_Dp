@@ -62,7 +62,7 @@ try:
     from PIL import Image
     img_logo = Image.open("logo.png")
     st.set_page_config(page_title="Panel Cierre Diario Dp", page_icon=img_logo, layout="wide")
-except:
+except Exception:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
@@ -71,12 +71,12 @@ def obtener_imagen_base64(ruta_imagen):
     try:
         with open(ruta_imagen, "rb") as archivo_img:
             return base64.b64encode(archivo_img.read()).decode()
-    except:
+    except Exception:
         return None
 
 logo_base64 = obtener_imagen_base64("logo.png")
 
-# CABECERA PERFECTA: Alineada, junta y cargando el logo directamente de forma local
+# CABECERA: Alineada y cargando el logo directamente de forma local
 if logo_base64:
     st.markdown(
         f"""
