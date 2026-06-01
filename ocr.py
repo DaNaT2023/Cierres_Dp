@@ -167,7 +167,6 @@ with pestaña_tiendas:
         if encargado.strip() == "":
             st.error("Por favor, introduce el nombre del encargado.")
         else:
-            # INSERCIÓN CORREGIDA AL 100% (29 CAMPOS CUADRADOS)
             conn = sqlite3.connect("pizzerias_final.db")
             cursor = conn.cursor()
             cursor.execute("""
@@ -192,18 +191,22 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTABLE Y ALINEADO)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA LINEAL PLANA ANTIFALLOS)
 # ------------------------------------------
 with pestaña_dueño:
-    if not st.session_state.autenticado:
-        st.subheader("🔒 Acceso Restringido")
-        input_usuario = st.text_input("Usuario", key="login_user_propietario")
-        input_password = st.text_input("Contraseña", type="password", key="login_pass_propietario")
+    st.subheader("🔒 Panel de Control del Administrador")
+    
+    # Comprobación mediante caja de texto directa
+    clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
+    
+    if clave_ingresada == st.secrets["ADMIN_PASSWORD"]:
+        st.markdown("---")
+        st.success("🔓 Acceso concedido de forma correcta.")
         
-        if st.button("🔓 Entrar al Panel", key="btn_autenticar_propietario"):
-            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
-    else:
+        conn = sqlite3.connect("pizzerias_final.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
+        
+        if df.empty:
+            st.info("Aún no se han registrado cierres en la base de datos de control. Rellena el primero desde la pestaña de envío.")
+        else:
