@@ -103,82 +103,88 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (EDICIÓN DIRECTA)
+# SECCIÓN: PANEL DEL PROPIETARIO (CON ACCESO RESTRINGIDO)
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("📊 Resumen General de Cierres")
-    
-    conn = sqlite3.connect("tiendas.db")
-    df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
-    conn.close()
-    
-    if df.empty:
-        st.info("Aún no se han registrado cierres en la base de datos.")
+    # Inicializar la variable de sesión para controlar si está logueado o no
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    # CASO A: No está autenticado -> Mostrar pantalla de Login
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido para Dirección")
+        input_usuario = st.text_input("Usuario", key="l_user")
+        input_password = st.text_input("Contraseña", type="password", key="l_pass")
+        
+        if st.button("🔓 Entrar al Panel", key="btn_auth", use_container_width=True):
+            if input_usuario == st.secrets["ADMIN_USER"] and input_password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.autenticado = True
+                st.success("¡Acceso concedido!")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
+                
+    # CASO B: Sí está autenticado -> Mostrar el panel completo de control
     else:
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-        with col_f2:
-            alertas_disponibles = list(df['estado_alerta'].unique())
-            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
+        # Botón elegante en la esquina superior para poder salir
+        col_header, col_logout = st.columns([6, 1])
+        with col_header:
+            st.subheader("📊 Resumen General de Cierres")
+        with col_logout:
+            if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
+                st.session_state.autenticado = False
+                st.rerun()
         
-        # Filtrado base
-        df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+        conn = sqlite3.connect("tiendas.db")
+        df = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
+        conn.close()
         
-        # Mapeo de nombres internos a etiquetas bonitas para mostrar al usuario
-        columnas_mapeo = {
-            'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
-            'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
-            'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
-            'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
-        }
-        
-        # Inverso del mapeo para saber qué columna real de la BD se está editando
-        mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
-        
-        # Creamos una vista filtrada solo con las columnas del propietario y nombres limpios
-        df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
-        
-        # Métricas principales superiores
-        st.markdown("### 📈 Métricas del Grupo")
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
-        with col_m2:
-            st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
-        with col_m3:
-            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
-        
-        st.markdown("---")
-        st.subheader("📝 Tabla Histórica de Cierres (Doble clic para editar o pulsa Supr para borrar filas)")
-        st.caption("💡 Nota: Puedes modificar cualquier celda directamente. Si deseas eliminar un turno completo, selecciónalo y pulsa la tecla 'Suprimir' en tu teclado. Al terminar, dale al botón verde de abajo para guardar.")
-        
-        # Activamos el editor interactivo de datos (st.data_editor)
-        tabla_editada = st.data_editor(
-            df_vista, 
-            use_container_width=True, 
-            hide_index=True,
-            num_rows="dynamic",  # Permite al usuario borrar filas usando la tecla Supr/Delete
-            column_config={
-                "ID": st.column_config.NumberColumn(disabled=True), # El ID no se puede editar por seguridad
-                "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
-                "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
-                "Venta 2025": st.column_config.NumberColumn(format="%.2f €"),
-                "Tarjeta": st.column_config.NumberColumn(format="%.2f €"),
-                "Efectivo": st.column_config.NumberColumn(format="%.2f €"),
-                "Pluxee": st.column_config.NumberColumn(format="%.2f €"),
-                "Quebranto": st.column_config.NumberColumn(format="%.2f €"),
-                "Prosegur": st.column_config.NumberColumn(format="%.2f €"),
-                "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
-                "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
-            },
-            key="editor_propietario"
-        )
-        
-        # Botón para consolidar los cambios en el archivo tiendas.db
-        if st.button("💾 Guardar Cambios en la Base de Datos", type="primary", use_container_width=True):
-            conn = sqlite3.connect("tiendas.db")
-            cursor = conn.cursor()
+        if df.empty:
+            st.info("Aún no se han registrado cierres en la base de datos.")
+        else:
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
+            with col_f2:
+                alertas_disponibles = list(df['estado_alerta'].unique())
+                alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
             
-            # 1. Detectar filas eliminadas en la interfaz de Streamlit
-            estado_editor = st.session_state["editor_propietario"]
+            # Filtrado base
+            df_filtrado = df[df['tienda'].isin(tiendas_filtro) & df['estado_alerta'].isin(alertas_filtro)].copy()
+            
+            # Mapeo de nombres internos a etiquetas visibles limpias
+            columnas_mapeo = {
+                'id': 'ID', 'fecha': 'Fecha', 'tienda': 'Tienda', 'turno': 'Turno', 'encargado': 'Encargado',
+                'venta_neta': 'Venta Neta', 'venta_total': 'Venta Bruta', 'venta_2025': 'Venta 2025',
+                'venta_visa': 'Tarjeta', 'venta_efectivo': 'Efectivo', 'venta_pluxee': 'Pluxee',
+                'quebranto': 'Quebranto', 'ingreso_prosegur': 'Prosegur', 'estado_alerta': 'Estado'
+            }
+            
+            mapeo_inverso = {v: k for k, v in columnas_mapeo.items()}
+            df_vista = df_filtrado[list(columnas_mapeo.keys())].rename(columns=columnas_mapeo)
+            
+            # Métricas principales superiores
+            st.markdown("### 📈 Métricas del Grupo")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.metric("Venta Bruta Total", f"{df_filtrado['venta_total'].sum():,.2f} €")
+            with col_m2:
+                st.metric("Balance de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
+            with col_m3:
+                st.metric("Turnos Registrados", f"{len(df_filtrado)}")
+            
+            st.markdown("---")
+            st.subheader("📝 Tabla Histórica de Cierres (Editable)")
+            st.caption("💡 Haz doble clic sobre una celda para corregir datos, o selecciona una fila y pulsa 'Suprimir' para borrarla.")
+            
+            # Editor interactivo protegido por la sesión
+            tabla_editada = st.data_editor(
+                df_vista, 
+                use_container_width=True, 
+                hide_index=True,
+                num_rows="dynamic",
+                column_config={
+                    "ID": st.column_config.NumberColumn(disabled=True),
+                    "Venta Neta": st.column_config.NumberColumn(format="%.2f €"),
+                    "Venta Bruta": st.column_config.NumberColumn(format="%.2f €"),
