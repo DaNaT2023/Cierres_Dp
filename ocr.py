@@ -121,7 +121,7 @@ with pestaña_tiendas:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Conexión Directa Blindada)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Together AI (Llama Eficiente)..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -133,8 +133,6 @@ with pestaña_tiendas:
                     prompt_ocr = f"Analiza la imagen de la tabla de caja diaria. Extrae los datos específicamente para el turno de la: {turno_seleccionado}. Reglas: 1. Extrae los datos de la columna correspondiente al turno solicitado. 2. Si un valor numérico está unificado o centrado (ej. Venta total, Web, TGTG, Uber Eats, Glovo, Just Eat), utiliza ese valor único. 3. Devuelve los datos estrictamente en formato JSON válido, sin bloques markdown ni explicaciones."
                     
                     url = "https://together.xyz"
-                    
-                    # CLAVE INTEGRADA DIRECTAMENTE AQUÍ PARA EVITAR ERRORES DE CACHÉ Y SALTOS DE LÍNEA
                     api_key_fija = "tgp_v1_6xomcp2r7wdNWUv32dUu5UGf1_og47bcFUmZcZs_QQU"
                     
                     headers = {
@@ -143,7 +141,8 @@ with pestaña_tiendas:
                     }
                     
                     payload = {
-                        "model": "meta-llama/Llama-3.2-90B-Vision-Instruct",
+                        # CAMBIO AL MODELO EFICIENTE (Evita bloqueos de fondos en cuentas prepago)
+                        "model": "meta-llama/Llama-3.2-11B-Vision-Instruct",
                         "messages": [
                             {
                                 "role": "user",
@@ -208,3 +207,4 @@ with pestaña_tiendas:
                             st.session_state.ingreso_prosegur_detectada = convertir_a_float(datos_json.get("ingreso_prosegur"))
                             st.session_state.web_detectada = convertir_a_float(datos_json.get("web"))
                             st.session_state.tgtg_detectada = convertir_a_float(datos_json.get("tgtg"))
+                            st.session_state.uber_eats_detectada = convertir_a_float(datos_json.get("uber_eats"))
