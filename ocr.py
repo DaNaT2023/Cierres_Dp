@@ -20,7 +20,7 @@ LISTA_TIENDAS = [
     "Dp Vicálvaro"
 ]
 
-# Inicializar variables en el estado de la sesión para evitar fallos de lectura
+# Inicializar variables en el estado de la sesión
 if "tienda_detectada" not in st.session_state:
     st.session_state.tienda_detectada = "Dp Valdebebas"
 if "encargado_detectado" not in st.session_state:
@@ -109,16 +109,16 @@ with pestaña_tiendas:
     
     col_pre1, col_pre2 = st.columns(2)
     with col_pre1:
-        turno_seleccionado = st.radio("¿Qué turno vas a escanear/subir ahora?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
+        turno_seleccionado = st.radio("¿Qué turno vas a subir?", ["Mañana", "Noche"], horizontal=True, key="selector_turno_superior")
     
     st.subheader("📸 Subir Recuadro Diario")
-    imagen_subida = st.file_uploader("Arrastra o selecciona la foto del recuadro diario", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
+    imagen_subida = st.file_uploader("Selecciona la foto del recuadro", type=["png", "jpg", "jpeg"], key="cargador_imagenes_tiendas")
     
     if imagen_subida is not None:
         st.image(imagen_subida, caption="Imagen cargada correctamente", width=300)
         
         if st.button("🔍 Leer Recuadro con IA", key="btn_ejecutar_ocr_ia"):
-            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Google Gemini (SDK Oficial)..."):
+            with st.spinner(f"Analizando turno de la {turno_seleccionado} con Google Gemini..."):
                 texto_respuesta = ""
                 error_detectado = False
                 
@@ -136,10 +136,10 @@ with pestaña_tiendas:
                     texto_respuesta = response.text.strip()
                         
                 except Exception as api_err:
-                    st.error(f"Error con el motor oficial de Gemini: {api_err}. Revisa tu clave en Secrets.")
+                    st.error(f"Error con Gemini: {api_err}")
                     error_detectado = True
 
-                # PROCESAMIENTO LINEAL PROTEGIDO
+                # PROCESAMIENTO LINEAL
                 if not error_detectado and texto_respuesta:
                     inicio_json = texto_respuesta.find("{")
                     fin_json = texto_respuesta.rfind("}") + 1
@@ -149,7 +149,7 @@ with pestaña_tiendas:
                         try:
                             datos_json = json.loads(texto_respuesta[inicio_json:fin_json])
                         except:
-                            st.error("No se pudo estructurar el contenido como JSON.")
+                            st.error("Error al estructurar JSON.")
                         
                         if datos_json is not None:
                             f_str = datos_json.get("fecha", "")
@@ -184,10 +184,10 @@ with pestaña_tiendas:
                             st.session_state.glovo_detectada = convertir_a_float(datos_json.get("glovo"))
                             st.session_state.just_eat_detectada = convertir_a_float(datos_json.get("just_eat"))
                             
-                            st.success("¡Datos del recuadro cargados con éxito!")
+                            st.success("¡Datos cargados con éxito!")
                             st.rerun()
                     else:
-                        st.error("La IA no contiene un formato de tabla válido.")
+                        st.error("Formarto no válido.")
 
     st.markdown("---")
     st.subheader("📝 Confirmar Datos del Formulario")
@@ -196,9 +196,11 @@ with pestaña_tiendas:
     if st.session_state.tienda_detectada in LISTA_TIENDAS:
         tienda_idx = LISTA_TIENDAS.index(st.session_state.tienda_detectada)
         
-    # ESTRUCTURA DE 3 COLUMNÁSTRAS INDEPENDIENTES CORREGIDA
+    # Formulario compacto adaptado a móviles
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        tienda = st.selectbox("Selecciona tu Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
-        encargado = st.text_input("Nombre del Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
+        tienda = st.selectbox("Tienda", LISTA_TIENDAS, index=tienda_idx, key="combo_tiendas_formulario")
+        encargado = st.text_input("Encargado", value=st.session_state.encargado_detectado, key="input_encargado_formulario")
+        fecha = st.date_input("Fecha", value=st.session_state.fecha_detectada, key="input_fecha_formulario")
+        venta_neta = st.number_input("Venta Neta (€)", value=st.session_state.venta_neta_detectada, step=10.0, key="input_vn_formulario")
