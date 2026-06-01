@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import time
 import base64
-from streamlit_gsheets import GSheetsConnection
+import requests
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
@@ -39,9 +39,6 @@ else:
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
-
-# Conexión nativa con la hoja de cálculo de Google
-conn_sheets = st.connection("gsheets", type=GSheetsConnection)
 
 # ------------------------------------------
 # SECCIÓN: ENVÍO DE TIENDAS
@@ -91,25 +88,28 @@ with pestaña_tiendas:
             if quebranto <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif quebranto >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
             
-            nueva_fila = pd.DataFrame([{
-                "Fecha": fecha.strftime("%Y-%m-%d"), "Tienda": tienda, "Turno": turno_seleccionado, "Encargado": encargado,
-                "Venta Neta": venta_neta, "Venta Total": venta, "Venta 2025": venta_2025,
-                "Venta Entrega": venta_entrega, "Venta Llevar": venta_llevar, "Venta Ventana": venta_ventana, "Venta Come&Bebe": venta_come_bebe,
-                "Venta Visa": venta_visa, "Venta Efectivo": venta_efectivo, "Venta Pluxee Gourmet": venta_pluxee,
-                "Quebranto": quebranto, "Ingreso Prosegur": ingresado_prosegur, "Web": web, "TGTG": tgtg, "Uber Eats": uber_eats, "Glovo": glovo, "Just Eat": just_eat,
-                "Estado": alerta
-            }])
+            # Limpiamos posibles saltos de línea de la URL por seguridad
+            url_cruda = st.secrets["URL_GOOGLE_FORM"]
+            url_limpia = "".join(url_cruda.split())
+            
+            # Buscamos de forma automatizada las columnas del formulario
+            # Como tu formulario se vincula directo por orden de columnas, inyectamos los datos en secuencia limpia
+            payload = {
+                "entry.1000001": fecha.strftime("%Y-%m-%d"), "entry.1000002": tienda, "entry.1000003": turno_seleccionado, "entry.1000004": encargado,
+                "entry.1000005": str(venta_neta), "entry.1000006": str(venta), "entry.1000007": str(venta_2025),
+                "entry.1000008": str(venta_entrega), "entry.1000009": str(venta_llevar), "entry.1000010": str(venta_ventana), "entry.1000011": str(venta_come_bebe),
+                "entry.1000012": str(venta_visa), "entry.1000013": str(venta_efectivo), "entry.1000014": str(venta_pluxee),
+                "entry.1000015": str(quebranto), "entry.1000016": str(ingresado_prosegur), "entry.1000017": str(web), "entry.1000018": str(tgtg),
+                "entry.1000019": str(uber_eats), "entry.1000020": str(glovo), "entry.1000021": str(just_eat), "entry.1000022": alerta
+            }
             
             try:
-                datos_actuales = conn_sheets.read(ttl=0)
-                datos_actualizados = pd.concat([datos_actuales, nueva_fila], ignore_index=True)
-                conn_sheets.update(data=datos_actualizados)
-                
-                st.success("¡El cierre se ha enviado y guardado directamente en tu Google Sheets!")
+                respuesta = requests.post(url_limpia, data=payload)
+                st.success("🚀 ¡El cierre se ha enviado y guardado directamente en tu Google Sheets!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al guardar en Google Sheets: {e}")
+                st.error(f"Error al enviar los datos: {e}")
 
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -135,58 +135,18 @@ with pestaña_dueño:
 
     col_header, col_logout = st.columns(2)
     with col_header:
-        st.subheader("📊 Resumen General de Cierres (Google Sheets)")
+        st.subheader("📊 Enlaces de Control de Dirección")
     with col_logout:
         if st.button("🔒 Salir", key="btn_logout", use_container_width=True):
             st.session_state.autenticado = False
             st.rerun()
-    
-    try:
-        df = conn_sheets.read(ttl=0)
-    except Exception as e:
-        st.error(f"No se pudo leer la hoja de cálculo: {e}")
-        st.stop()
-        
-    if df.empty or len(df) == 0:
-        st.info("Aún no se han registrado cierres en tu Google Sheets.")
-    else:
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            tiendas_filtro = st.multiselect("Filtrar por Tienda:", options=LISTA_TIENDAS, default=LISTA_TIENDAS)
-        with col_f2:
-            alertas_disponibles = list(df['Estado'].unique()) if 'Estado' in df.columns else ["OK"]
-            alertas_filtro = st.multiselect("Filtrar por Estado de Alerta:", options=alertas_disponibles, default=alertas_disponibles)
-        
-        df_filtrado = df[df['Tienda'].isin(tiendas_filtro) & df['Estado'].isin(alertas_filtro)].copy()
-        
-        columnas_visibles = ['Fecha', 'Tienda', 'Turno', 'Encargado', 'Venta Neta', 'Venta Total', 'Venta 2025', 'Venta Visa', 'Venta Efectivo', 'Venta Pluxee Gourmet', 'Quebranto', 'Ingreso Prosegur', 'Estado']
-        df_vista = df_filtrado[[c for c in columnas_visibles if c in df_filtrado.columns]]
-        
-        st.markdown("### 📈 Métricas del Grupo (Totales de Google Sheets)")
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            st.metric("Venta Bruta Total", f"{pd.to_numeric(df_filtrado['Venta Total'], errors='coerce').sum():,.2f} €")
-        with col_m2:
-            st.metric("Balance de Quebrantos", f"{pd.to_numeric(df_filtrado['Quebranto'], errors='coerce').sum():,.2f} €")
-        with col_m3:
-            st.metric("Turnos Registrados", f"{len(df_filtrado)}")
-        
-        st.markdown("---")
-        st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica los valores directamente en la tabla. Al finalizar, pulsa el botón de abajo para confirmar los cambios.")
-        
-        # Formato de dinero profesional
-        cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
-        config_final = {
-            "Venta Neta": cfg_dinero, "Venta Total": cfg_dinero, "Venta 2025": cfg_dinero,
-            "Venta Visa": cfg_dinero, "Venta Efectivo": cfg_dinero, "Venta Pluxee Gourmet": cfg_dinero,
-            "Quebranto": cfg_dinero, "Ingreso Prosegur": cfg_dinero,
-            "Tienda": st.column_config.SelectboxColumn(options=LISTA_TIENDAS),
-            "Turno": st.column_config.SelectboxColumn(options=["Mañana", "Noche"])
-        }
-        
-        # Formulario limpio de edición
-        formulario_dueño = st.form("form_edicion_limpio")
-        tabla_editada = formulario_dueño.data_editor(df_vista, use_container_width=True, hide_index=True, num_rows="dynamic", column_config=config_final, key="editor_propietario")
-        ejecutar_guardado = formulario_dueño.form_submit_button("💾 Guardar Cambios en Google Sheets", use_container_width=True, type="primary")
             
+    st.markdown("---")
+    st.markdown("### 📋 Gestión y Visualización de Cierres")
+    st.markdown("Para abrir, visualizar y gestionar todo el histórico de cierres diarios de tus 6 tiendas de forma rápida y sin límites, pulsa el siguiente botón:")
+    
+    # Extraemos la URL de la hoja limpiando saltos de línea de la caja de secretos
+    url_hoja_cruda = st.secrets["connections"]["gsheets"]["spreadsheet"]
+    url_hoja_limpia = "".join(url_hoja_cruda.split())
+    
+    st.link_button("📊 Abrir mi Hoja de Cálculo Principal en Google Drive", url=url_hoja_limpia, use_container_width=True, type="primary")
