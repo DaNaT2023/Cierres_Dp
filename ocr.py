@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
+import base64
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES (DP)
@@ -65,16 +66,29 @@ except:
     st.set_page_config(page_title="Panel Cierre Diario Dp", layout="wide")
     img_logo = None
 
-# CABECERA COMPACTA HTML: Logo y título juntos sin importar el tamaño del monitor
-st.markdown(
-    """
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: -10px; margin-top: -30px;">
-        <img src="https://githubusercontent.com" width="60" style="object-fit: contain;">
-        <h1 style="margin: 0; padding: 0; font-size: 2.5rem; font-weight: 700; color: #31333F; line-height: 60px;">Panel Cierre Diario Dp</h1>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# Convertir la imagen local logo.png a Base64 para inyectarla de forma segura en HTML
+def obtener_imagen_base64(ruta_imagen):
+    try:
+        with open(ruta_imagen, "rb") as archivo_img:
+            return base64.b64encode(archivo_img.read()).decode()
+    except:
+        return None
+
+logo_base64 = obtener_imagen_base64("logo.png")
+
+# CABECERA PERFECTA: Alineada, junta y cargando el logo directamente de forma local
+if logo_base64:
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: -10px; margin-top: -30px;">
+            <img src="data:image/png;base64,{logo_base64}" width="60" style="object-fit: contain;">
+            <h1 style="margin: 0; padding: 0; font-size: 2.5rem; font-weight: 700; color: #31333F; line-height: 60px;">Panel Cierre Diario Dp</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.title("🍕 Panel Cierre Diario Dp")
 
 st.markdown("---")
 
@@ -205,6 +219,3 @@ with pestaña_dueño:
             st.metric("Balance Total de Quebrantos", f"{df_filtrado['quebranto'].sum():,.2f} €")
             st.write(f"Turnos totales registrados en el filtro: {len(df_filtrado)}")
             
-            st.markdown("---")
-            st.subheader("📋 Histórico de Turnos")
-            st.dataframe(df_filtrado, use_container_width=True)
