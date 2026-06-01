@@ -199,16 +199,5 @@ with pestaña_dueño:
             st.markdown("---")
             st.subheader("📋 Histórico de Turnos")
             
-            st.dataframe(
-                df_filtrado,
-                column_config={
-                    "id": None,
-                    "fecha": "Fecha",
-                    "tienda": "Tienda",
-                    "turno": "Turno",
-                    "encargado": "Encargado",
-                    "venta_neta": st.column_config.NumberColumn("Venta Neta", format="%.2f €"),
-                    "venta_total": st.column_config.NumberColumn("Venta Bruta", format="%.2f €"),
-                    "venta_2025": st.column_config.NumberColumn("Venta 2025", format="%.2f €"),
-                    "venta_entrega": st.column_config.NumberColumn("Entrega", format="%.2f €"),
-                    "venta_llevar": st.column_config.NumberColumn("Llevar", format="%.2f €"),
+            # Tabla plana limpia sin formato de diccionario para evitar errores de llaves
+            st.dataframe(df_filtrado, use_container_width=True)
