@@ -189,10 +189,10 @@ with pestaña_tiendas:
             st.rerun()
 
 # ------------------------------------------
-# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA DE LÍNEA HORIZONTAL COMPLETA)
+# SECCIÓN: PANEL DEL PROPIETARIO (ESTRUCTURA DE LÍNEA HORIZONTAL COMPLETA CORREGIDA)
 # ------------------------------------------
 with pestaña_dueño:
-    st.subheader("🔒 Panel de Control del Administrador")
+    st.subheader("🔒 Panel de Control del Administrator")
     clave_ingresada = st.text_input("Introduce la contraseña de acceso:", type="password", key="pass_propietario_plana")
     
     if clave_ingresada != st.secrets["ADMIN_PASSWORD"]:
@@ -207,4 +207,5 @@ with pestaña_dueño:
     df_db = pd.read_sql_query("SELECT * FROM recuadros ORDER BY fecha DESC, id DESC", conn)
     conn.close()
     
-    # Si la base de datos está vacía, creamos una fila vacía visual para pintar las columnas en horizontal
+    # Nombres de las columnas en horizontal exactos de tu lista
+    columnas_horizontales = [
