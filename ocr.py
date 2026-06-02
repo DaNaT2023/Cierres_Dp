@@ -5,6 +5,12 @@ import datetime
 import time
 import base64
 import io
+import smtplib
+from datetime import timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
 # ==========================================
 # 0. CONFIGURACIÓN DE TUS 6 TIENDAS REALES
@@ -12,7 +18,7 @@ import io
 LISTA_TIENDAS = ["Dp Valdebebas", "Dp Collado", "Dp Paracuellos", "Dp Villanueva", "Dp Galapagar", "Dp Vicálvaro"]
 
 # ==========================================
-# 1. BASE DE DATOS LOCAL (CON NUEVA COLUMNA DE OBSERVACIONES DIRECCIÓN)
+# 1. BASE DE DATOS LOCAL CON MOTOR DE RESCATE
 # ==========================================
 def inicializar_bd():
     conexion = sqlite3.connect("tiendas.db")
@@ -26,7 +32,12 @@ def inicializar_bd():
             cancelaciones_obs TEXT, estado_alerta TEXT, anotaciones_jefe TEXT
         )
     """)
-    # Parche de seguridad para bases de datos ya existentes en producción
+    # Tabla auxiliar para que el robot recuerde qué días ya mandó el Excel de rescate
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS envios_rescate (
+            fecha TEXT PRIMARY KEY
+        )
+    """)
     try:
         cursor.execute("ALTER TABLE recuadros ADD COLUMN anotaciones_jefe TEXT")
     except sqlite3.OperationalError:
@@ -36,8 +47,88 @@ def inicializar_bd():
 
 inicializar_bd()
 
+def verificar_y_marcar_rescate(fecha_str):
+    """Comprueba en la BD si ya se mandó el rescate de esa fecha para no duplicar."""
+    conexion = sqlite3.connect("tiendas.db")
+    cursor = conexion.cursor()
+    cursor.execute("SELECT 1 FROM envios_rescate WHERE fecha = ?", (fecha_str,))
+    ya_enviado = cursor.fetchone() is not None
+    if not ya_enviado:
+        cursor.execute("INSERT INTO envios_rescate (fecha) VALUES (?)", (fecha_str,))
+        conexion.commit()
+    conexion.close()
+    return ya_enviado
+
 # ==========================================
-# 2. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
+# 2. BOT DE ENVÍO AUTOMÁTICO (GMAIL SECRETS)
+# ==========================================
+def enviar_excel_reporte(fecha_reporte, es_rescate=False):
+    """Extrae los datos guardados de la fecha, genera el Excel en memoria y lo envía por Gmail."""
+    conexion = sqlite3.connect("tiendas.db")
+    df_envio = pd.read_sql_query("SELECT * FROM recuadros WHERE fecha = ?", conexion, params=(fecha_reporte,))
+    conexion.close()
+    
+    if df_envio.empty:
+        return False
+
+    # Extracción segura de credenciales desde los Secrets de Streamlit
+    GMAIL_USER = st.secrets["gmail"]["user"]
+    GMAIL_PASS = st.secrets["gmail"]["pass"]
+
+    buffer_excel = io.BytesIO()
+    with pd.ExcelWriter(buffer_excel, engine='openpyxl') as escritor:
+        df_envio.to_excel(escritor, index=False, sheet_name='Reporte Diario')
+    excel_adjunto = buffer_excel.getvalue()
+
+    msg = MIMEMultipart()
+    msg['From'] = GMAIL_USER
+    msg['To'] = GMAIL_USER 
+    
+    tipo_envio = "[RESCATE MAÑANA]" if es_rescate else "[CIERRE NOCHE]"
+    msg['Subject'] = f"{tipo_envio} Reporte Consolidado Tiendas - {fecha_reporte}"
+    
+    cuerpo = f"Hola,\n\nAdjunto encuentras el reporte consolidado de las tiendas ({fecha_reporte}).\n"
+    if es_rescate:
+        cuerpo += "Nota: Este correo se envió automáticamente por la mañana al detectar un cierre incompleto de la noche anterior."
+    msg.attach(MIMEText(cuerpo, 'plain'))
+
+    part = MIMEBase('application', 'octet-stream')
+    part.set_payload(excel_adjunto)
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', f'attachment; filename="Reporte_{fecha_reporte}.xlsx"')
+    msg.attach(part)
+
+    try:
+        server = smtplib.SMTP_SSL('://gmail.com', 465)
+        server.login(GMAIL_USER, GMAIL_PASS)
+        server.sendmail(GMAIL_USER, GMAIL_USER, msg.as_string())
+        server.close()
+        return True
+    except Exception as e:
+        st.error(f"Error crítico en el bot de correo: {e}")
+        return False
+
+# ==========================================
+# 3. LÓGICA INTELIGENTE: SALVAVIDAS DOBLE TURNO
+# ==========================================
+def ejecutar_salvavidas_doble_turno():
+    """Al pulsar el botón por la mañana, revisa si ayer se quedó colgado el servidor y lo rescata."""
+    fecha_ayer = (datetime.date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    conexion = sqlite3.connect("tiendas.db")
+    cursor = conexion.cursor()
+    cursor.execute("SELECT COUNT(DISTINCT tienda) FROM recuadros WHERE fecha = ? AND turno = 'Noche'", (fecha_ayer,))
+    tiendas_noche_ayer = cursor.fetchone()[0]
+    conexion.close()
+    
+    # Si por la noche enviaron datos pero no llegaron a completar las 6 tiendas
+    if 0 < tiendas_noche_ayer < 6:
+        ya_rescatado = verificar_y_marcar_rescate(fecha_ayer)
+        if not ya_rescatado:
+            enviar_excel_reporte(fecha_ayer, es_rescate=True)
+            st.warning(f"⚠️ ¡Salvavidas Activado! Se detectó un cierre incompleto ayer ({tiendas_noche_ayer}/6 tiendas). Excel de rescate enviado automáticamente.")
+# ==========================================
+# 4. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
 st.set_page_config(page_title="Cierre Diario DP", layout="wide")
 
@@ -66,6 +157,7 @@ else:
 st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
+
 # ------------------------------------------
 # SECCIÓN: ENVÍO DE TIENDAS
 # ------------------------------------------
@@ -112,7 +204,6 @@ with pestaña_tiendas:
         uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_ub")
         glovo = st.number_input("Glovo (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_gl")
         just_eat = st.number_input("Just Eat (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_je")
-
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar", use_container_width=True):
         if encargado.strip() == "":
@@ -140,6 +231,8 @@ with pestaña_tiendas:
             if v_quebranto_val <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif v_quebranto_val >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
                 
+            fecha_formateada = fecha.strftime("%Y-%m-%d")
+            
             conn = sqlite3.connect("tiendas.db")
             cursor = conn.cursor()
             cursor.execute("""
@@ -150,12 +243,28 @@ with pestaña_tiendas:
                     cancelaciones_obs, estado_alerta, anotaciones_jefe
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, v_neta_val, v_total_val, v_2025_val,
+                fecha_formateada, tienda, turno_seleccionado, encargado, v_neta_val, v_total_val, v_2025_val,
                 v_entrega_val, v_llevar_val, v_ventana_val, v_come_bebe_val, v_visa_val,
                 v_efectivo_val, v_pluxee_val, v_quebranto_val, v_prosegur_val, v_web_val, v_tgtg_val, v_uber_val, v_glovo_val, v_just_val, 
                 incidencias_texto, alerta, ""
             ))
             conn.commit()
+            
+            # --- MOTOR DE RECUENTO AUTOMÁTICO EN TIEMPO REAL ---
+            # 1. Si el registro lo hace un encargado en el turno de la MAÑANA, revisamos si ayer faltó algo
+            if turno_seleccionado.lower() == 'mañana':
+                ejecutar_salvavidas_doble_turno()
+                
+            # 2. Si es el turno de la NOCHE, contamos cuántas tiendas únicas han cerrado HOY
+            elif turno_seleccionado.lower() == 'noche':
+                cursor.execute("SELECT COUNT(DISTINCT tienda) FROM recuadros WHERE fecha = ? AND turno = 'Noche'", (fecha_formateada,))
+                tiendas_completadas_hoy = cursor.fetchone()[0]
+                
+                # Flujo óptimo: Si entra el reporte de la sexta tienda de la noche, se empaqueta y se manda el Excel
+                if tiendas_completadas_hoy == 6:
+                    enviar_excel_reporte(fecha_formateada, es_rescate=False)
+                    st.toast("🎉 ¡Las 6 tiendas han completado el cierre de la noche! Excel consolidado enviado a dirección.")
+            
             conn.close()
             st.success("¡El cierre se ha guardado correctamente!")
             
@@ -270,7 +379,6 @@ with pestaña_dueño:
         df_filtrado = df_vista[df_vista['Tienda'].isin(tiendas_filtro) & df_vista['Estado'].isin(alertas_filtro)].copy()
         
         st.markdown("### 📈 Métricas del Grupo")
-        
         buffer_excel = io.BytesIO()
         with pd.ExcelWriter(buffer_excel, engine='openpyxl') as escritor:
             df_vista.to_excel(escritor, index=False, sheet_name='Historial Cierres')
@@ -293,7 +401,6 @@ with pestaña_dueño:
                 use_container_width=True,
                 key="btn_descarga_seguridad_propietario"
             )
-            
         st.markdown(" ")
         with st.expander("🔄 Importar / Añadir cierres desde un archivo copia externa"):
             archivo_añadir = st.file_uploader("Sube tu archivo .xlsx de copia de seguridad:", type=["xlsx"], key="recuperacion_activa_dueño")
@@ -369,29 +476,4 @@ with pestaña_dueño:
                     
                     v_quebranto = float(fila["Quebranto"])
                     n_alerta = "OK"
-                    if v_quebranto <= -100: n_alerta = "🚨 CRÍTICO (Pérdida)"
-                    elif v_quebranto >= 100: n_alerta = "⚠️ ATENCIÓN (Exceso)"
-                    
-                    cursor.execute("""
-                        UPDATE recuadros SET 
-                            fecha=?, tienda=?, turno=?, encargado=?, venta_neta=?, venta_total=?, venta_2025=?,
-                            venta_visa=?, venta_efectivo=?, venta_pluxee=?, quebranto=?, ingreso_prosegur=?, 
-                            cancelaciones_obs=?, estado_alerta=?, anotaciones_jefe=?
-                        WHERE id=?
-                    """, (
-                        str(fila["Fecha"]), str(fila["Tienda"]), str(fila["Turno"]), str(fila["Encargado"]),
-                        float(fila["Venta Neta"]), float(fila["Venta Bruta"]), float(fila["Venta 2025"]),
-                        float(fila["Tarjeta"]), float(fila["Efectivo"]), float(fila["Pluxee"]),
-                        v_quebranto, float(fila["Prosegur"]), str(fila["Encargado OBS"]), n_alerta, 
-                        str(fila["Observaciones"]), id_reg
-                    ))
-                
-                conn.commit()
-                conn.close()
-                
-                if "df_original" in st.session_state:
-                    del st.session_state.df_original
-                
-                st.success("Cambios guardados correctamente")
-                time.sleep(0.8)
-                st.rerun()
+                    if v_quebranto <= -100: n_alerta = "🚨 CRÍTICO (Pérd
