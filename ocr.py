@@ -32,7 +32,7 @@ def inicializar_bd():
             cancelaciones_obs TEXT, estado_alerta TEXT, anotaciones_jefe TEXT
         )
     """)
-    # Tabla auxiliar para que el robot recuerde qué días ya mandó el Excel de rescate
+    # Tabla auxiliar para controlar el Salvavidas de Doble Turno
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS envios_rescate (
             fecha TEXT PRIMARY KEY
@@ -48,7 +48,7 @@ def inicializar_bd():
 inicializar_bd()
 
 def verificar_y_marcar_rescate(fecha_str):
-    """Comprueba en la BD si ya se mandó el rescate de esa fecha para no duplicar."""
+    """Comprueba en la BD si ya se mandó el rescate de esa fecha para evitar duplicados."""
     conexion = sqlite3.connect("tiendas.db")
     cursor = conexion.cursor()
     cursor.execute("SELECT 1 FROM envios_rescate WHERE fecha = ?", (fecha_str,))
@@ -58,12 +58,11 @@ def verificar_y_marcar_rescate(fecha_str):
         conexion.commit()
     conexion.close()
     return ya_enviado
-
 # ==========================================
 # 2. BOT DE ENVÍO AUTOMÁTICO (GMAIL SECRETS)
 # ==========================================
 def enviar_excel_reporte(fecha_reporte, es_rescate=False):
-    """Extrae los datos guardados de la fecha, genera el Excel en memoria y lo envía por Gmail."""
+    """Extrae los datos de la BD, arma el Excel en memoria y lo envía por Gmail."""
     conexion = sqlite3.connect("tiendas.db")
     df_envio = pd.read_sql_query("SELECT * FROM recuadros WHERE fecha = ?", conexion, params=(fecha_reporte,))
     conexion.close()
@@ -71,7 +70,7 @@ def enviar_excel_reporte(fecha_reporte, es_rescate=False):
     if df_envio.empty:
         return False
 
-    # Extracción segura de credenciales desde los Secrets de Streamlit
+    # Extraer credenciales seguras de los Secrets
     GMAIL_USER = st.secrets["gmail"]["user"]
     GMAIL_PASS = st.secrets["gmail"]["pass"]
 
@@ -99,20 +98,22 @@ def enviar_excel_reporte(fecha_reporte, es_rescate=False):
     msg.attach(part)
 
     try:
-        server = smtplib.SMTP_SSL('://gmail.com', 465)
+        # Timeout de 10 segundos para que la aplicación NUNCA se quede colgada si falla internet
+        server = smtplib.SMTP_SSL('://gmail.com', 465, timeout=10)
         server.login(GMAIL_USER, GMAIL_PASS)
         server.sendmail(GMAIL_USER, GMAIL_USER, msg.as_string())
         server.close()
         return True
     except Exception as e:
-        st.error(f"Error crítico en el bot de correo: {e}")
+        # Si Google tarda en responder, muestra un aviso en la barra lateral sin romper la app
+        st.sidebar.warning(f"Aviso de red en el Bot: {e}")
         return False
 
 # ==========================================
 # 3. LÓGICA INTELIGENTE: SALVAVIDAS DOBLE TURNO
 # ==========================================
 def ejecutar_salvavidas_doble_turno():
-    """Al pulsar el botón por la mañana, revisa si ayer se quedó colgado el servidor y lo rescata."""
+    """Al pulsar el botón por la mañana, revisa si ayer se quedó a medias y lo rescata."""
     fecha_ayer = (datetime.date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
     
     conexion = sqlite3.connect("tiendas.db")
@@ -121,12 +122,12 @@ def ejecutar_salvavidas_doble_turno():
     tiendas_noche_ayer = cursor.fetchone()[0]
     conexion.close()
     
-    # Si por la noche enviaron datos pero no llegaron a completar las 6 tiendas
+    # Si cerraron menos de las 6 tiendas por la noche
     if 0 < tiendas_noche_ayer < 6:
         ya_rescatado = verificar_y_marcar_rescate(fecha_ayer)
         if not ya_rescatado:
             enviar_excel_reporte(fecha_ayer, es_rescate=True)
-            st.warning(f"⚠️ ¡Salvavidas Activado! Se detectó un cierre incompleto ayer ({tiendas_noche_ayer}/6 tiendas). Excel de rescate enviado automáticamente.")
+            st.warning(f"⚠️ ¡Salvavidas Activado! Se detectó un cierre incompleto ayer ({tiendas_noche_ayer}/6 tiendas). Excel de rescate enviado a dirección.")
 # ==========================================
 # 4. CONFIGURACIÓN DE PÁGINA E ICONO CORPORATIVO
 # ==========================================
@@ -158,9 +159,6 @@ st.markdown("---")
 
 pestaña_tiendas, pestaña_dueño = st.tabs(["📲 Envío de Tiendas", "👁️ Panel del Propietario"])
 
-# ------------------------------------------
-# SECCIÓN: ENVÍO DE TIENDAS
-# ------------------------------------------
 with pestaña_tiendas:
     st.header("📝 Cierre de Turno")
     turno_seleccionado = st.radio("¿Qué turno vas a registrar?", ["Mañana", "Noche"], horizontal=True, key="sel_turno")
@@ -204,6 +202,7 @@ with pestaña_tiendas:
         uber_eats = st.number_input("Uber Eats (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_ub")
         glovo = st.number_input("Glovo (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_gl")
         just_eat = st.number_input("Just Eat (€)", min_value=0.0, step=10.0, value=None, placeholder="Escribe la cantidad...", key="f_je")
+
     st.markdown("---")
     if st.button("🚀 Guardar Registro del Turno", key="btn_guardar", use_container_width=True):
         if encargado.strip() == "":
@@ -231,8 +230,7 @@ with pestaña_tiendas:
             if v_quebranto_val <= -100: alerta = "🚨 CRÍTICO (Pérdida)"
             elif v_quebranto_val >= 100: alerta = "⚠️ ATENCIÓN (Exceso)"
                 
-            fecha_formateada = fecha.strftime("%Y-%m-%d")
-            
+            # 1. GUARDADO EXPRÉS EN LA BASE DE DATOS LOCAL
             conn = sqlite3.connect("tiendas.db")
             cursor = conn.cursor()
             cursor.execute("""
@@ -243,35 +241,34 @@ with pestaña_tiendas:
                     cancelaciones_obs, estado_alerta, anotaciones_jefe
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                fecha_formateada, tienda, turno_seleccionado, encargado, v_neta_val, v_total_val, v_2025_val,
+                fecha.strftime("%Y-%m-%d"), tienda, turno_seleccionado, encargado, v_neta_val, v_total_val, v_2025_val,
                 v_entrega_val, v_llevar_val, v_ventana_val, v_come_bebe_val, v_visa_val,
                 v_efectivo_val, v_pluxee_val, v_quebranto_val, v_prosegur_val, v_web_val, v_tgtg_val, v_uber_val, v_glovo_val, v_just_val, 
                 incidencias_texto, alerta, ""
             ))
             conn.commit()
             
-            # --- MOTOR DE RECUENTO AUTOMÁTICO EN TIEMPO REAL ---
-            # 1. Si el registro lo hace un encargado en el turno de la MAÑANA, revisamos si ayer faltó algo
-            if turno_seleccionado.lower() == 'mañana':
-                ejecutar_salvavidas_doble_turno()
-                
-            # 2. Si es el turno de la NOCHE, contamos cuántas tiendas únicas han cerrado HOY
-            elif turno_seleccionado.lower() == 'noche':
-                cursor.execute("SELECT COUNT(DISTINCT tienda) FROM recuadros WHERE fecha = ? AND turno = 'Noche'", (fecha_formateada,))
-                tiendas_completadas_hoy = cursor.fetchone()[0]
-                
-                # Flujo óptimo: Si entra el reporte de la sexta tienda de la noche, se empaqueta y se manda el Excel
-                if tiendas_completadas_hoy == 6:
-                    enviar_excel_reporte(fecha_formateada, es_rescate=False)
-                    st.toast("🎉 ¡Las 6 tiendas han completado el cierre de la noche! Excel consolidado enviado a dirección.")
-            
+            # Recuento en tiempo real de cierres de noche para hoy
+            fecha_hoy_str = fecha.strftime("%Y-%m-%d")
+            cursor.execute("SELECT COUNT(DISTINCT tienda) FROM recuadros WHERE fecha = ? AND turno = 'Noche'", (fecha_hoy_str,))
+            total_tiendas_noche = cursor.fetchone()[0]
             conn.close()
-            st.success("¡El cierre se ha guardado correctamente!")
+            
+            st.success(f"¡El cierre se ha guardado correctamente! (Tiendas noche registradas hoy: {total_tiendas_noche}/6)")
             
             if "df_original" in st.session_state:
                 del st.session_state.df_original
                 
-            time.sleep(1)
+            # 2. PROCESAMIENTO DEL CORREO SIN PERMITIR QUE SE CONGELE LA PANTALLA
+            if turno_seleccionado.lower() == 'mañana':
+                ejecutar_salvavidas_doble_turno()
+                
+            if turno_seleccionado.lower() == 'noche' and total_tiendas_noche == 6:
+                st.info("🔄 Procesando y enviando el reporte consolidado de las 6 tiendas a dirección...")
+                enviar_excel_reporte(fecha_hoy_str, es_rescate=False)
+                st.balloons()
+                
+            time.sleep(1.2)
             st.rerun()
 # ------------------------------------------
 # SECCIÓN: PANEL DEL PROPIETARIO
@@ -281,7 +278,6 @@ with pestaña_dueño:
         st.session_state.autenticado = False
         st.session_state.usuario_activo = ""
 
-    # Sistema de perfiles dobles integrado
     if not st.session_state.autenticado:
         st.subheader("🔒 Acceso Restringido para Dirección")
         input_usuario = st.text_input("Usuario", key="l_user")
@@ -340,34 +336,6 @@ with pestaña_dueño:
     df_vista = st.session_state.df_original
     if df_vista.empty:
         st.info("Aún no se han registrado cierres en la base de datos.")
-        st.markdown("### 🔄 Restaurar Copia de Seguridad Nativa")
-        st.caption("Sube tu archivo .xlsx guardado previamente para recuperar el historial íntegro:")
-        
-        archivo_subido = st.file_uploader("Selecciona el archivo de copia de seguridad:", type=["xlsx"], key="recuperacion_vacia_dueño")
-        if archivo_subido is not None:
-            try:
-                df_recuperado = pd.read_excel(archivo_subido, engine='openpyxl')
-                mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
-                df_recuperado_bd = df_recuperado.rename(columns=mapeo_inverso_bd)
-                
-                columnas_db = ['fecha', 'tienda', 'turno', 'encargado', 'venta_neta', 'venta_total', 'venta_2025', 'venta_entrega', 'venta_llevar', 'venta_ventana', 'venta_come_bebe', 'venta_visa', 'venta_efectivo', 'venta_pluxee', 'quebranto', 'ingreso_prosegur', 'web', 'tgtg', 'uber_eats', 'glovo', 'just_eat', 'cancelaciones_obs', 'estado_alerta', 'anotaciones_jefe']
-                for col in columnas_db:
-                    if col not in df_recuperado_bd.columns:
-                        df_recuperado_bd[col] = "" if col in ['cancelaciones_obs', 'anotaciones_jefe'] else 0.0
-                
-                df_recuperado_bd = df_recuperado_bd[[c for c in columnas_db if c in df_recuperado_bd.columns]]
-                
-                conn = sqlite3.connect("tiendas.db")
-                df_recuperado_bd.to_sql("recuadros", conn, if_exists="append", index=False)
-                conn.close()
-                
-                st.success("¡Historial completo restaurado con éxito!")
-                if "df_original" in st.session_state:
-                    del st.session_state.df_original
-                time.sleep(1)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al procesar la copia de seguridad: {e}")
     else:
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -401,34 +369,9 @@ with pestaña_dueño:
                 use_container_width=True,
                 key="btn_descarga_seguridad_propietario"
             )
-        st.markdown(" ")
-        with st.expander("🔄 Importar / Añadir cierres desde un archivo copia externa"):
-            archivo_añadir = st.file_uploader("Sube tu archivo .xlsx de copia de seguridad:", type=["xlsx"], key="recuperacion_activa_dueño")
-            if archivo_añadir is not None:
-                if st.button("⚡ Confirmar inserción masiva de datos", use_container_width=True, type="secondary"):
-                    try:
-                        df_extraido = pd.read_excel(archivo_añadir, engine='openpyxl')
-                        mapeo_inverso_bd = {v: k for k, v in columnas_mapeo.items()}
-                        df_extraido_bd = df_extraido.rename(columns=mapeo_inverso_bd)
-                        
-                        if "id" in df_extraido_bd.columns:
-                            df_extraido_bd = df_extraido_bd.drop(columns=["id"])
-                            
-                        conn = sqlite3.connect("tiendas.db")
-                        df_extraido_bd.to_sql("recuadros", conn, if_exists="append", index=False)
-                        conn.close()
-                        
-                        st.success("¡Datos inyectados y consolidados de forma nativa!")
-                        if "df_original" in st.session_state:
-                            del st.session_state.df_original
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error en la importación: {e}")
         
         st.markdown("---")
         st.subheader("📝 Tabla Histórica de Cierres (Editable)")
-        st.caption("💡 Modifica las celdas directamente en la tabla. El botón de guardar aparecerá abajo automáticamente si hay cambios.")
         
         cfg_dinero = st.column_config.NumberColumn(format="%.2f €")
         es_nataly = (st.session_state.usuario_activo == "Nataly")
@@ -459,7 +402,6 @@ with pestaña_dueño:
 
         if es_nataly and (not edited_df.equals(df_filtrado)):
             st.warning("⚠️ Hay cambios pendientes por confirmar")
-            
             if st.button("💾 Guardar cambios", use_container_width=True, type="primary", key="btn_guardar_cambios_modelo_captura"):
                 conn = sqlite3.connect("tiendas.db")
                 cursor = conn.cursor()
@@ -473,7 +415,28 @@ with pestaña_dueño:
                 
                 for index, fila in edited_df.iterrows():
                     id_reg = int(fila["ID"])
-                    
                     v_quebranto = float(fila["Quebranto"])
                     n_alerta = "OK"
-                    if v_quebranto <= -100: n_alerta = "🚨 CRÍTICO (Pérd
+                    if v_quebranto <= -100: n_alerta = "🚨 CRÍTICO (Pérdida)"
+                    elif v_quebranto >= 100: n_alerta = "⚠️ ATENCIÓN (Exceso)"
+                    
+                    cursor.execute("""
+                        UPDATE recuadros SET 
+                            fecha=?, tienda=?, turno=?, encargado=?, venta_neta=?, venta_total=?, venta_2025=?,
+                            venta_visa=?, venta_efectivo=?, venta_pluxee=?, quebranto=?, ingreso_prosegur=?, 
+                            cancelaciones_obs=?, estado_alerta=?, anotaciones_jefe=?
+                        WHERE id=?
+                    """, (
+                        str(fila["Fecha"]), str(fila["Tienda"]), str(fila["Turno"]), str(fila["Encargado"]),
+                        float(fila["Venta Neta"]), float(fila["Venta Bruta"]), float(fila["Venta 2025"]),
+                        float(fila["Tarjeta"]), float(fila["Efectivo"]), float(fila["Pluxee"]),
+                        v_quebranto, float(fila["Prosegur"]), str(fila["Encargado OBS"]), n_alerta, 
+                        str(fila["Observaciones"]), id_reg
+                    ))
+                conn.commit()
+                conn.close()
+                if "df_original" in st.session_state:
+                    del st.session_state.df_original
+                st.success("Cambios guardados correctamente")
+                time.sleep(0.8)
+                st.rerun()
